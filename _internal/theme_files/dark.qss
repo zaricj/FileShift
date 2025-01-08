@@ -1,0 +1,122 @@
+QMainWindow {
+    background-color: #282a36;
+    color: #e2e2e2;
+}
+
+QWidget {
+    background-color: #282a36;
+    color: #e2e2e2;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 13px;
+}
+
+QLabel {
+    color: #e2e2e2;
+    font-weight: bold;
+}
+
+QGroupBox {
+    font-weight: bold;
+    font-size: 12px;
+    border: 1px solid #424242;
+    border-radius: 6px;
+    padding-top: 15px;
+}
+
+QLineEdit, QTreeView {
+    background-color: #21252b;
+    border: 1px solid #5a5f6b;
+    border-radius: 6px;
+    padding: 8px;
+    color: #e2e2e2;
+}
+
+QTextEdit {
+    background-color: #21252b;
+    border: 1px solid #5a5f6b;
+    border-radius: 6px;
+    padding: 8px;
+    color: #e2e2e2;
+    font-size: 12px;
+}
+
+QLineEdit:focus, QTextEdit:focus, QTreeView:focus {
+    border-color: #1b5ae2;
+    font-size: 12px;
+}
+
+QComboBox {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 4px;
+    background-color: #21252b;
+    color: #e2e2e2;
+}
+
+QPushButton {
+    background-color: #1b5ae2;
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-weight: bold;
+    min-width: 80px;
+    border: none;
+}
+
+QPushButton:hover {
+    background-color: #1142ac;
+}
+
+QPushButton:pressed {
+    background-color: #21252b;
+}
+
+QPushButton:disabled {
+    background-color: #a0a0a0;
+    color: #606060;
+}
+
+QTreeView::item:selected {
+    background-color: #1b5ae2;
+    color: #2e2e2e;
+}
+
+QTreeView::item {
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+QMenuBar {
+    border-bottom: 2px solid #1b5ae2;
+    background-color: #282a36;
+    color: #e2e2e2;
+}
+
+QMenuBar::item:selected {
+    background-color: #21252b;
+}
+
+QMenu {
+    background-color: #282a36;
+    color: #e2e2e2;
+    border: 1px solid #4e4e4e;
+    border-radius: 8px;
+}
+
+QMenu::item:selected {
+    background-color: #1b5ae2;
+    color: #2e2e2e;
+}
+
+QStatusBar {
+    background-color: #3b3f51;
+    border: 1px solid #6d6d6d;
+    border-radius: 8px;
+    color: #e2e2e2;
+}
+
+QStatusBar:disabled {
+    background-color: #3b3f51;
+    color: #b0b0b0;
+}
