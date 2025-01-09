@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         # Input paths layout
         horizontal_layout_a = QHBoxLayout()
         self.file_path_input = QLineEdit(self)
-        self.file_path_input.setPlaceholderText('Enter the path to the text file containing file paths')
+        self.file_path_input.setPlaceholderText('Enter the path to the text file which contains file paths...')
         horizontal_layout_a.addWidget(self.file_path_input)
     
         self.browse_button = QPushButton('Browse File', self)
@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
     
         horizontal_layout_b = QHBoxLayout()
         self.destination_input = QLineEdit(self)
-        self.destination_input.setPlaceholderText('Enter the destination directory')
+        self.destination_input.setPlaceholderText('Enter the destination directory where the files should be moved to...')
         horizontal_layout_b.addWidget(self.destination_input)
     
         self.set_folder_button = QPushButton('Set Folder', self)
@@ -134,7 +134,9 @@ class MainWindow(QMainWindow):
     
     def open_folder_helper_method(self, folder_path):
         try:
-            if not os.path.isdir(folder_path) or not os.path.exists(folder_path):
+            if len(folder_path) == 0:
+                QMessageBox.critical(self,"No file path provided","Please provide a file path first.")
+            elif not os.path.isdir(folder_path) or not os.path.exists(folder_path):
                 QMessageBox.critical(self,"Not a valid path",f"The entered folder path '{folder_path}' is not valid or does not exist.")
             else:
                 os.startfile(folder_path)
