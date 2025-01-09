@@ -20,14 +20,14 @@ QGroupBox {
     font-size: 12px;
     border: 1px solid #424242;
     border-radius: 6px;
-    padding-top: 15px;
+    padding-top: 2px;
 }
 
 QLineEdit, QTreeView {
     background-color: #21252b;
     border: 1px solid #5a5f6b;
     border-radius: 6px;
-    padding: 8px;
+    padding: 4px;
     color: #e2e2e2;
 }
 
@@ -35,7 +35,7 @@ QTextEdit {
     background-color: #21252b;
     border: 1px solid #5a5f6b;
     border-radius: 6px;
-    padding: 8px;
+    padding: 4px;
     color: #e2e2e2;
     font-size: 12px;
 }
@@ -88,7 +88,6 @@ QTreeView::item {
 }
 
 QMenuBar {
-    border-bottom: 2px solid #1b5ae2;
     background-color: #282a36;
     color: #e2e2e2;
 }
@@ -119,4 +118,20 @@ QStatusBar {
 QStatusBar:disabled {
     background-color: #3b3f51;
     color: #b0b0b0;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 1px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1b5ae2; /* Neon title */
+    letter-spacing: 0.8px;
+}
+
+QGroupBox {
+    border: 1px solid #6a717b;
+    margin: 8px;
+    border-radius: 10px;
 }

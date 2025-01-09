@@ -1,10 +1,11 @@
 import sys
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox
-from PySide6.QtGui import QTextOption, QCloseEvent, QIcon
-from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 import shutil
+import os
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget
+from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
+from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Settings to save current location of the windows on exit
@@ -15,90 +16,131 @@ class MainWindow(QWidget):
         self.initialize_theme('_internal\\theme_files\\dark.qss')
         self.setWindowIcon(icon)
         self.initUI()
-
-    def initUI(self):
         self.setWindowTitle('File Mover')
         self.setGeometry(800, 400, 1000, 700)
+        self.create_menu_bar()
 
-        layout = QVBoxLayout()
-
+    def initUI(self):
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
+    
         # Input paths layout
         horizontal_layout_a = QHBoxLayout()
         self.file_path_input = QLineEdit(self)
         self.file_path_input.setPlaceholderText('Enter the path to the text file containing file paths')
         horizontal_layout_a.addWidget(self.file_path_input)
-
+    
         self.browse_button = QPushButton('Browse File', self)
         self.browse_button.clicked.connect(self.browse_files)
         horizontal_layout_a.addWidget(self.browse_button)
-        layout.addLayout(horizontal_layout_a)
-
+        main_layout.addLayout(horizontal_layout_a)
+    
         horizontal_layout_b = QHBoxLayout()
         self.destination_input = QLineEdit(self)
         self.destination_input.setPlaceholderText('Enter the destination directory')
         horizontal_layout_b.addWidget(self.destination_input)
-
+    
         self.set_folder_button = QPushButton('Set Folder', self)
         self.set_folder_button.clicked.connect(self.browse_folder)
         horizontal_layout_b.addWidget(self.set_folder_button)
-        layout.addLayout(horizontal_layout_b)
-
+        main_layout.addLayout(horizontal_layout_b)
+    
         # Move button
         self.move_button = QPushButton('Move Files', self)
         self.move_button.clicked.connect(self.move_files)
-        layout.addWidget(self.move_button)
-
+        main_layout.addWidget(self.move_button)
+    
         # Status label
         self.status_label = QLabel('', self)
-        layout.addWidget(self.status_label)
-
-        # Group box for text editors
-        text_edit_layout = QHBoxLayout()
-        font_size_List = ["12px", "14px", "16px", "18px", "20px"]
-
-        # File view
+        main_layout.addWidget(self.status_label)
+    
+        # Horizontal layout for File View and Program Output
+        horizontal_layout_c = QHBoxLayout()
+    
+        # Group box for File View
+        file_view_groupbox = QGroupBox("File View")
         file_view_layout = QVBoxLayout()
         file_view_horizontal_layout = QHBoxLayout()
+    
+        font_size_List = ["12px", "14px", "16px", "18px", "20px"]
         self.file_view_label = QLabel("Font Size:", self)
         self.file_view_combobox = QComboBox()
+        self.file_view_combobox.setMinimumWidth(100)
         self.file_view_combobox.setCurrentText("12px")
         self.file_view_combobox.addItems(font_size_List)
-        self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(f"font-size: {self.file_view_combobox.currentText()}"))
-        
+        self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(f"font-size: {self.file_view_combobox.currentText   ()}"))
+    
         self.file_content_display = QTextEdit(self)
         self.file_content_display.setReadOnly(False)
         self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
-        
+    
         file_view_horizontal_layout.addWidget(self.file_view_label)
         file_view_horizontal_layout.addWidget(self.file_view_combobox)
         file_view_horizontal_layout.addStretch()
         file_view_layout.addLayout(file_view_horizontal_layout)
         file_view_layout.addWidget(self.file_content_display)
-        text_edit_layout.addLayout(file_view_layout)
-
-        # Program output
+        file_view_groupbox.setLayout(file_view_layout)
+        horizontal_layout_c.addWidget(file_view_groupbox)
+    
+        # Group box for Program Output
+        program_output_groupbox = QGroupBox("Program Output")
         program_output_layout = QVBoxLayout()
         program_output_horizontal_layout = QHBoxLayout()
+    
         self.font_size_label = QLabel("Font Size:", self)
         self.font_size_combobox = QComboBox()
+        self.font_size_combobox.setMinimumWidth(100)
         self.font_size_combobox.setCurrentText("12px")
         self.font_size_combobox.addItems(font_size_List)
         self.font_size_combobox.currentIndexChanged.connect(lambda: self.program_output.setStyleSheet(f"font-size: {self.font_size_combobox.currentText()}"))
-        
+    
         self.program_output = QTextEdit(self)
         self.program_output.setReadOnly(True)
         self.program_output.setWordWrapMode(QTextOption.ManualWrap)
-        
+    
         program_output_horizontal_layout.addWidget(self.font_size_label)
         program_output_horizontal_layout.addWidget(self.font_size_combobox)
         program_output_horizontal_layout.addStretch()
         program_output_layout.addLayout(program_output_horizontal_layout)
         program_output_layout.addWidget(self.program_output)
-        text_edit_layout.addLayout(program_output_layout)
+        program_output_groupbox.setLayout(program_output_layout)
+        horizontal_layout_c.addWidget(program_output_groupbox)
+    
+        main_layout.addLayout(horizontal_layout_c)
+    
+        self.setCentralWidget(central_widget)
 
-        layout.addLayout(text_edit_layout)
+    def create_menu_bar(self):
+        menubar = self.menuBar()
+        
+        # File menu
+        file_menu = menubar.addMenu("&File")
 
-        self.setLayout(layout)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # Open Menu
+        open_menu = menubar.addMenu("&Open")
+        
+        open_csv_folder = QAction("Open Destination Folder", self)
+        open_csv_folder.triggered.connect(lambda: self.open_folder_helper_method(self.destination_input.text()))
+        open_menu.addAction(open_csv_folder)
+        
+        # Help menu
+        help_menu = menubar.addMenu("&Help")
+        how_to_use_action = QAction("How to Use", self)
+        help_menu.addAction(how_to_use_action)
+    
+    def open_folder_helper_method(self, folder_path):
+        try:
+            if not os.path.isdir(folder_path) or not os.path.exists(folder_path):
+                QMessageBox.critical(self,"Not a valid path",f"The entered folder path '{folder_path}' is not valid or does not exist.")
+            else:
+                os.startfile(folder_path)
+        except Exception as ex:
+            message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
+            QMessageBox.critical(self, "Error", message)
         
     def browse_files(self):
         file_dialog = QFileDialog(self)
