@@ -1,10 +1,10 @@
 QMainWindow {
-    background-color: #282a36;
+    background-color: #212121;
     color: #e2e2e2;
 }
 
 QWidget {
-    background-color: #282a36;
+    background-color: #212121;
     color: #e2e2e2;
     font-family: 'Segoe UI', sans-serif;
     font-size: 13px;
@@ -24,7 +24,7 @@ QGroupBox {
 }
 
 QLineEdit, QTreeView {
-    background-color: #21252b;
+    background-color: #2e2e2e;
     border: 1px solid #5a5f6b;
     border-radius: 6px;
     padding: 4px;
@@ -32,7 +32,7 @@ QLineEdit, QTreeView {
 }
 
 QTextEdit {
-    background-color: #21252b;
+    background-color: #2e2e2e;
     border: 1px solid #5a5f6b;
     border-radius: 6px;
     padding: 4px;
@@ -48,9 +48,9 @@ QLineEdit:focus, QTextEdit:focus, QTreeView:focus {
 QComboBox {
     font-size: 12px;
     font-weight: bold;
-    padding: 5px;
-    border-radius: 4px;
-    background-color: #21252b;
+    padding: 2px;
+    border: 1px solid #5a5f6b;
+    background-color: #2e2e2e;
     color: #e2e2e2;
 }
 
@@ -69,7 +69,7 @@ QPushButton:hover {
 }
 
 QPushButton:pressed {
-    background-color: #21252b;
+    background-color: #2e2e2e;
 }
 
 QPushButton:disabled {
@@ -88,16 +88,16 @@ QTreeView::item {
 }
 
 QMenuBar {
-    background-color: #282a36;
+    background-color: #212121;
     color: #e2e2e2;
 }
 
 QMenuBar::item:selected {
-    background-color: #21252b;
+    background-color: #2e2e2e;
 }
 
 QMenu {
-    background-color: #282a36;
+    background-color: #212121;
     color: #e2e2e2;
     border: 1px solid #4e4e4e;
     border-radius: 8px;
@@ -109,10 +109,11 @@ QMenu::item:selected {
 }
 
 QStatusBar {
-    background-color: #3b3f51;
+    background-color: #2e2e2e;
     border: 1px solid #6d6d6d;
     border-radius: 8px;
     color: #e2e2e2;
+    font-weight: bold;
 }
 
 QStatusBar:disabled {
@@ -126,7 +127,7 @@ QGroupBox::title {
     padding: 0 1px;
     font-size: 14px;
     font-weight: 600;
-    color: #1b5ae2; /* Neon title */
+    color: #ffffff;
     letter-spacing: 0.8px;
 }
 
