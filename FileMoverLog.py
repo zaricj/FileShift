@@ -1,9 +1,13 @@
 import sys
 import shutil
 import os
+import re
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
+
+# //TODO Add feature to get "Marking file ..." lines and extract their file paths
+# //TODO Add input field for user to create replace ./lib/ with D:/Lobster_data/lib/ for example
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -45,6 +49,11 @@ class MainWindow(QMainWindow):
         self.set_folder_button.clicked.connect(self.browse_folder)
         horizontal_layout_b.addWidget(self.set_folder_button)
         main_layout.addLayout(horizontal_layout_b)
+        
+        # Log file dates combobox
+        self.log_dates_combobox = QComboBox(self)
+        self.log_dates_combobox.setMinimumWidth(100)
+        self.log_dates_combobox.currentTextChanged.connect(lambda:self.extract_lines_by_date_and_display(self.extract_data_from_log(self.file_path_input.text()), self.log_dates_combobox.currentText()))
     
         # Move button
         self.move_button = QPushButton('Move Files', self)
@@ -75,7 +84,9 @@ class MainWindow(QMainWindow):
         self.file_content_display = QTextEdit(self)
         self.file_content_display.setReadOnly(False)
         self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
-    
+
+        file_view_horizontal_layout.addWidget(QLabel("Log Date:", self))
+        file_view_horizontal_layout.addWidget(self.log_dates_combobox)
         file_view_horizontal_layout.addWidget(self.file_view_label)
         file_view_horizontal_layout.addWidget(self.file_view_combobox)
         file_view_horizontal_layout.addStretch()
@@ -99,7 +110,7 @@ class MainWindow(QMainWindow):
         self.program_output = QTextEdit(self)
         self.program_output.setReadOnly(True)
         self.program_output.setWordWrapMode(QTextOption.ManualWrap)
-    
+
         program_output_horizontal_layout.addWidget(self.font_size_label)
         program_output_horizontal_layout.addWidget(self.font_size_combobox)
         program_output_horizontal_layout.addStretch()
@@ -196,25 +207,45 @@ class MainWindow(QMainWindow):
         # Write the cleaned lines back to the file
         with open(file_path, 'w') as file:
             file.writelines(cleaned_lines)
+    
+    def extract_dates_from_log(self, log_content):
+        date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
+        dates = sorted(set(re.findall(date_pattern, log_content)))
+        return dates
+    
+    def extract_lines_by_date_and_display(self, log_content, selected_date):
+        filtered_lines = [
+            line for line in log_content.splitlines() if line.startswith(selected_date)
+        ]
+        try:
+            if log_content:
+                self.file_content_display.clear()
+                self.program_output.setText(f"Loaded log entries for selected date {selected_date} in file view...")
+                for text_line in filtered_lines:
+                    self.file_content_display.append(text_line)
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while displaying the log entries: {str(ex)}")
+        return filtered_lines
+    
+    def extract_data_from_log(self, file_path):
+        try:
+            with open(file_path, 'r') as file:
+                file_data = file.read()
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
+        return file_data
         
     def browse_file(self):
         file_dialog = QFileDialog(self)
-        file_path, _ = file_dialog.getOpenFileName(self, 'Open File', '', 'Text Files (*.txt)')
+        file_path, _ = file_dialog.getOpenFileName(self, 'Open File', '', 'Log Files (*.log)')
         if file_path:
+            self.file_content_display.clear()
             self.file_path_input.setText(file_path)
             with open(file_path, 'r') as file:
-                self.clean_file(file_path)
-                lines = file.readlines()
-                valid_file_paths = [line.strip() for line in lines if os.path.isfile(line.strip())]
-                if valid_file_paths:
-                    self.file_content_display.setText('\n'.join(valid_file_paths))
-                    total_lines = len(valid_file_paths)
-                    self.statusbar.showMessage(f'Found {total_lines} valid file paths in text file to move.')
-                else:
-                    self.file_content_display.setText('\n'.join(lines))
-                    self.statusbar.showMessage("No valid file paths found in text file to move.")
+                file_data = file.read()
+                self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
+            self.statusbar.showMessage("Loaded log file successfully.")
 
-    
     def get_line_count(self, file_path):
         with open(file_path, 'r') as file:
             lines = file.readlines()
