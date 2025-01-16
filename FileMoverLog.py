@@ -5,9 +5,102 @@ import re
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
+from datetime import datetime
 
 # //TODO Add feature to get "Marking file ..." lines and extract their file paths
 # //TODO Add input field for user to create replace ./lib/ with D:/Lobster_data/lib/ for example
+# // TODO Add input for string to replace from - to
+# // TODO Add input to search for regex pattern and replace all text in self.file_content_display with the found pattern
+
+class RegexGenerator:
+    def __init__(self, string_pattern_to_detect):
+        self.string_pattern_to_detect = string_pattern_to_detect
+        self.regex_string = ""
+        self.special_chars = '.^$*+?{}[]\\|()'
+        self.create_regex()
+
+    def create_regex(self):
+        if not self.string_pattern_to_detect:
+            return
+
+        # Add start anchor if needed
+        # self.regex_string = "^"  # Uncomment if you want to match from start of line
+
+        pattern_chunks = []
+        current_chunk = []
+        current_type = self.determine_char_type(self.string_pattern_to_detect[0])
+
+        # Process characters in groups
+        for char in self.string_pattern_to_detect:
+            char_type = self.determine_char_type(char)
+            
+            # For exact word matching, treat each character as special
+            if char_type == "CHARACTER":
+                if current_chunk and current_type != "CHARACTER":
+                    pattern_chunks.append((current_type, ''.join(current_chunk)))
+                    current_chunk = []
+                current_chunk.append(char)
+                current_type = char_type
+            else:
+                if current_chunk:
+                    pattern_chunks.append((current_type, ''.join(current_chunk)))
+                pattern_chunks.append((char_type, char))
+                current_chunk = []
+                current_type = char_type
+
+        # Add the last chunk
+        if current_chunk:
+            pattern_chunks.append((current_type, ''.join(current_chunk)))
+
+        # Convert chunks to regex
+        for chunk_type, chunk_content in pattern_chunks:
+            if chunk_type == "SPECIAL":
+                if chunk_content in self.special_chars:
+                    self.regex_string += f"\\{chunk_content}"
+                else:
+                    self.regex_string += f"{chunk_content}"
+            elif chunk_type == "CHARACTER":
+                # For exact word matching
+                self.regex_string += f"({chunk_content})"
+            else:
+                pattern = self.get_pattern_for_type(chunk_type)
+                if len(chunk_content) > 1:
+                    self.regex_string += f"{pattern}{{{len(chunk_content)}}}"
+                else:
+                    self.regex_string += pattern
+
+        # Add end anchor if needed
+        # self.regex_string += "$"  # Uncomment if you want to match to end of line
+
+    def get_pattern_for_type(self, char_type):
+        patterns = {
+            "DIGIT": "\\d",
+            "CHARACTER": "[a-zA-Z]",
+            "WHITESPACE": "\\s",
+            "SPECIAL": ""
+        }
+        return patterns.get(char_type, "")
+
+    def determine_char_type(self, char):
+        if char.isnumeric():
+            return "DIGIT"
+        elif char.isalpha():
+            return "CHARACTER"
+        elif char.isspace():
+            return "WHITESPACE"
+        else:
+            return "SPECIAL"
+
+    def get_regex(self):
+        return self.regex_string
+
+    def check_if_valid(self):
+        import re
+        try:
+            re.compile(self.regex_string)
+            return True
+        except re.error:
+            return False
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -55,15 +148,34 @@ class MainWindow(QMainWindow):
         self.log_dates_combobox.setMinimumWidth(100)
         self.log_dates_combobox.currentTextChanged.connect(lambda:self.extract_lines_by_date_and_display(self.extract_data_from_log(self.file_path_input.text()), self.log_dates_combobox.currentText()))
     
+        # Horizontal Layout Row 3
+        horizontal_layout_d = QHBoxLayout()
+        
         # Move button
         self.move_button = QPushButton('Move Files', self)
         self.move_button.clicked.connect(self.move_files)
-        main_layout.addWidget(self.move_button)
-    
-        # Status label
-        self.statusbar = QStatusBar()
-        self.statusbar.setSizeGripEnabled(False)
-        main_layout.addWidget(self.statusbar)
+        
+        # Input for regex pattern to search
+        self.regex_pattern_input = QLineEdit(self)
+        self.regex_pattern_input.setPlaceholderText('Enter string to convert to regex pattern to search file...')
+        self.regex_pattern_input.setToolTip('Enter a regex pattern to search for in the file content.')
+        self.search_file_button = QPushButton('Generate', self)
+        self.search_file_button.clicked.connect(self.generate_regex)
+        self.parse_file = QPushButton("Parse", self)
+        self.parse_file.clicked.connect(self.search_content)
+        
+        self.find_in_file_input = QLineEdit(self)
+        self.replace_in_file_input = QLineEdit(self)
+        self.find_in_file_input.setPlaceholderText('Enter string to find in file content...')
+        self.replace_in_file_input.setPlaceholderText('Enter string to replace in file content...')
+        
+        main_layout.addLayout(horizontal_layout_d)
+        horizontal_layout_d.addWidget(self.regex_pattern_input)
+        horizontal_layout_d.addWidget(self.search_file_button)
+        horizontal_layout_d.addWidget(self.parse_file)
+        horizontal_layout_d.addWidget(self.find_in_file_input)
+        horizontal_layout_d.addWidget(self.replace_in_file_input)
+        horizontal_layout_d.addWidget(self.move_button) 
     
         # Horizontal layout for File View and Program Output
         horizontal_layout_c = QHBoxLayout()
@@ -82,7 +194,7 @@ class MainWindow(QMainWindow):
         self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(f"font-size: {self.file_view_combobox.currentText()}"))
     
         self.file_content_display = QTextEdit(self)
-        self.file_content_display.setReadOnly(False)
+        self.file_content_display.setReadOnly(True)
         self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
 
         file_view_horizontal_layout.addWidget(QLabel("Log Date:", self))
@@ -120,6 +232,11 @@ class MainWindow(QMainWindow):
         horizontal_layout_c.addWidget(program_output_groupbox)
     
         main_layout.addLayout(horizontal_layout_c)
+        
+        # Statusbar label
+        self.statusbar = QStatusBar()
+        self.statusbar.setSizeGripEnabled(False)
+        main_layout.addWidget(self.statusbar)
     
         self.setCentralWidget(central_widget)
 
@@ -162,6 +279,23 @@ class MainWindow(QMainWindow):
         #help_menu = menubar.addMenu("&Help")
         #how_to_use_action = QAction("How to Use", self)
         #help_menu.addAction(how_to_use_action)
+        
+    def search_content(self):
+        # TODO Start with open with to get the actually fine content isntead of the displayed one
+        file_view_content = self.file_content_display.toPlainText()
+        regex_input = self.regex_pattern_input.text()
+        if len(regex_input) > 0:
+            matches = re.findall(regex_input, file_view_content)
+            if len(matches) > 0:
+                self.program_output.clear()
+                self.program_output.append(f"Found {len(matches)} matches for the regex pattern '{regex_input}' in the file content.")
+                # matches in a touple --> double values, can't use it that way
+                # TODO Add with open(file_name, "r") as file but try to mark the lines that match in the file_view_content
+                for match1,match2 in matches:
+                    self.program_output.append(match1)
+            else:
+                self.program_output.clear()
+                self.program_output.append(f"No matches found for the regex pattern '{regex_input}' in the file content.")
         
     def change_word_wrap(self):
         file_content_wrap_mode = self.file_content_display.wordWrapMode()
@@ -208,10 +342,32 @@ class MainWindow(QMainWindow):
         with open(file_path, 'w') as file:
             file.writelines(cleaned_lines)
     
+    def generate_regex(self):
+        try:
+            input_text = self.regex_pattern_input.text()
+            if len(input_text) > 0:
+                self.regex_pattern_input.clear()
+                self.generator = RegexGenerator(input_text)
+                self.regex_pattern_input.setText(self.generator.get_regex())
+                self.program_output.setText(f"Generated the following RegEx: '{self.generator.get_regex()}'.")
+            else:
+                QMessageBox.warning(self, "Input warning", "No string has been entered in the input element.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while generating the regex: {str(ex)}")
+    
     def extract_dates_from_log(self, log_content):
         date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
-        dates = sorted(set(re.findall(date_pattern, log_content)))
-        return dates
+        dates = set(re.findall(date_pattern, log_content))
+        date_format = "%d.%m.%y"
+        dates_datetime = [datetime.strptime(date, date_format
+                                            )  for date in dates]
+        # Sort the datetime objects
+        dates_datetime_sorted = sorted(dates_datetime)
+        # Convert datetime objects back to strings
+        dates_sorted = [datetime.strftime(date, date_format) for date in dates_datetime_sorted]
+        print(dates_sorted)
+        print("A")
+        return dates_sorted
     
     def extract_lines_by_date_and_display(self, log_content, selected_date):
         filtered_lines = [
@@ -229,22 +385,26 @@ class MainWindow(QMainWindow):
     
     def extract_data_from_log(self, file_path):
         try:
-            with open(file_path, 'r') as file:
-                file_data = file.read()
+            if file_path:
+                with open(file_path, 'r') as file:
+                    file_data = file.read()
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
         return file_data
         
     def browse_file(self):
-        file_dialog = QFileDialog(self)
-        file_path, _ = file_dialog.getOpenFileName(self, 'Open File', '', 'Log Files (*.log)')
-        if file_path:
-            self.file_content_display.clear()
-            self.file_path_input.setText(file_path)
-            with open(file_path, 'r') as file:
-                file_data = file.read()
-                self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
-            self.statusbar.showMessage("Loaded log file successfully.")
+        try:
+            file_dialog = QFileDialog(self)
+            file_path, _ = file_dialog.getOpenFileName(self, 'Open File', '', 'Log Files (*.log)')
+            if file_path:
+                self.file_content_display.clear()
+                self.file_path_input.setText(file_path)
+                with open(file_path, 'r') as file:
+                    file_data = file.read()
+                    self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
+                self.statusbar.showMessage("Loaded log file successfully.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(ex)}")
 
     def get_line_count(self, file_path):
         with open(file_path, 'r') as file:
