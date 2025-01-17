@@ -165,25 +165,27 @@ class MainWindow(QMainWindow):
         # Horizontal Layout for Regex and Replace
         horizontal_layout_d = QHBoxLayout()
         self.regex_pattern_input = QLineEdit(self)
-        self.regex_pattern_input.setPlaceholderText("Enter string to convert to regex pattern to search file...")
+        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern to search the file content...")
         self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the file content.")
         self.regex_pattern_input.setClearButtonEnabled(True)
-        self.search_file_button = QPushButton("Convert", self)
-        self.search_file_button.clicked.connect(self.generate_regex)
-        self.parse_file = QPushButton("Search", self)
-        self.parse_file.clicked.connect(self.search_and_replace_file_content)
+        self.convert_entered_string_to_regex_button = QPushButton("Convert", self)
+        self.convert_entered_string_to_regex_button.setToolTip("Convert the entered string to a regex pattern.")
+        self.convert_entered_string_to_regex_button.clicked.connect(self.generate_regex)
+        self.search_file_contents_and_display_button = QPushButton("Search", self)
+        self.search_file_contents_and_display_button.setToolTip("Search file content for the entered regex pattern and display only those matches.")
+        self.search_file_contents_and_display_button.clicked.connect(self.search_and_replace_file_content)
         horizontal_layout_d.addWidget(self.regex_pattern_input)
-        horizontal_layout_d.addWidget(self.search_file_button)
-        horizontal_layout_d.addWidget(self.parse_file)
+        horizontal_layout_d.addWidget(self.convert_entered_string_to_regex_button)
+        horizontal_layout_d.addWidget(self.search_file_contents_and_display_button)
 
         horizontal_layout_e = QHBoxLayout()
         self.find_string_input = QLineEdit(self)
         self.find_string_input.setPlaceholderText("Enter text to replace (e.g., ./lib/)")
-        self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the file content display.")
+        self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the file content display.\nExample: ./lib/")
         self.find_string_input.setClearButtonEnabled(True)
         self.replace_string_input = QLineEdit(self)
         self.replace_string_input.setPlaceholderText("Replace text in file content with (e.g., D:/Lobster_data/lib/)")
-        self.replace_string_input.setToolTip("Enter the text to replace the found text with in the file content display.")
+        self.replace_string_input.setToolTip("Enter the text to replace the found text with in the file content display.\n Example: D:/Lobster_data/lib/")
         self.replace_string_input.setClearButtonEnabled(True)
         self.phrase_to_remove_input = QLineEdit(self)
         self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove comma-separated (e.g., Marking file, to be deleted on exit of JVM)")
@@ -210,6 +212,7 @@ class MainWindow(QMainWindow):
         ))
         self.move_button = QPushButton("Move Files", self)
         self.move_button.setToolTip("Move the files to the destination directory.")
+        self.move_button.setMinimumWidth(100)
         self.move_button.clicked.connect(self.move_files)
 
         file_view_horizontal_layout.addWidget(QLabel("Log Date:", self))
@@ -225,8 +228,8 @@ class MainWindow(QMainWindow):
         self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
 
         file_view_layout.addLayout(horizontal_layout_d)
-        file_view_layout.addLayout(file_view_horizontal_layout)
         file_view_layout.addLayout(horizontal_layout_e)
+        file_view_layout.addLayout(file_view_horizontal_layout)
         file_view_layout.addWidget(self.file_content_display)
         file_view_groupbox.setLayout(file_view_layout)
         main_layout.addWidget(file_view_groupbox)
@@ -249,7 +252,7 @@ class MainWindow(QMainWindow):
         program_output_horizontal_layout.addStretch()
         program_output_layout.addLayout(program_output_horizontal_layout)
         program_output_layout.addWidget(self.program_output)
-        program_output_groupbox.setMaximumWidth(500)
+        program_output_groupbox.setMaximumWidth(680)
         program_output_groupbox.setLayout(program_output_layout)
         main_layout.addWidget(program_output_groupbox)
 
@@ -277,7 +280,7 @@ class MainWindow(QMainWindow):
         open_csv_folder.triggered.connect(lambda: self.open_folder_helper_method(self.destination_input.text()))
         open_menu.addAction(open_csv_folder)
         
-        open_file = QAction("Open Text File", self)
+        open_file = QAction("Open Input File", self)
         open_file.triggered.connect(lambda: self.open_file_helper_method(self.file_path_input.text()))
         open_menu.addAction(open_file)
         
@@ -342,14 +345,12 @@ class MainWindow(QMainWindow):
                 # Clean and replace each line
                 cleaned_line = self.clean_line(line, phrase_to_remove, original_phrase, replacement_phrase)
                 cleaned_lines.append(cleaned_line)
-
+            
             if cleaned_lines:
                 # Clear the display and show the updated content
                 self.statusbar.showMessage("Applied changes to the file content.", 10000)
                 self.file_content_display.clear()
                 self.file_content_display.setPlainText("\n".join(cleaned_lines))
-            else:
-                self.program_output.clear()
 
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while searching and replacing the file content: {str(ex)}")
@@ -514,6 +515,7 @@ class MainWindow(QMainWindow):
             warn_count = 0
 
             try:
+                # Cleaned paths without high commas in the file content display
                 lines = self.clean_paths_in_line(text_containing_file_paths)
                 total_lines = len(lines)
                 for line in lines:
