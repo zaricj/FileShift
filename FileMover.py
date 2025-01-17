@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
         # Log file dates combobox
         self.log_dates_combobox = QComboBox(self)
         self.log_dates_combobox.setToolTip("Select a date to view the log entries for that date.\nThis will re-display the log entries for the selected date in the file view.")
-        self.log_dates_combobox.setMinimumWidth(80)
+        self.log_dates_combobox.setMinimumWidth(85)
         self.log_dates_combobox.currentTextChanged.connect(lambda: self.extract_lines_by_date_and_display(
             self.extract_data_from_log(self.file_path_input.text()), 
             self.log_dates_combobox.currentText()
@@ -252,7 +252,7 @@ class MainWindow(QMainWindow):
         program_output_horizontal_layout.addStretch()
         program_output_layout.addLayout(program_output_horizontal_layout)
         program_output_layout.addWidget(self.program_output)
-        program_output_groupbox.setMaximumWidth(680)
+        program_output_groupbox.setMaximumWidth(600)
         program_output_groupbox.setLayout(program_output_layout)
         main_layout.addWidget(program_output_groupbox)
 
@@ -528,9 +528,11 @@ class MainWindow(QMainWindow):
                             sub_dir = "\\".join(file_to_move.split("\\")[-2:])  # Gets "lib\filename.jar"
                         # Create the full destination path
                         current_destination = os.path.join(destination, sub_dir)
-                        # Ensure the destination directory exists
-                        os.makedirs(os.path.dirname(current_destination), exist_ok=True)
+                        
                         try:
+                            # Ensure the destination directory exists
+                            if os.path.exists(file_to_move):
+                                os.makedirs(os.path.dirname(current_destination), exist_ok=True)
                             shutil.move(file_to_move, current_destination)
                             self.program_output.append(f"Moved <span style='color: #197cff'>{file_to_move}</span> to <span style='color: green'>{current_destination}</span>")
                             self.statusbar.showMessage(f"Moved {line_count}/{total_lines} files.", 10000)
