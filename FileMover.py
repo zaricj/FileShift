@@ -2,7 +2,7 @@ import sys
 import shutil
 import os
 import re
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 from datetime import datetime
@@ -16,7 +16,7 @@ class RegexGenerator:
     def __init__(self, string_pattern_to_detect):
         self.string_pattern_to_detect = string_pattern_to_detect
         self.regex_string = ""
-        self.special_chars = '.^$*+?{}[]\\|()'
+        self.special_chars = ".^$*+?{}[]\\|()"
         self.create_regex()
 
     def create_regex(self):
@@ -37,20 +37,20 @@ class RegexGenerator:
             # For exact word matching, treat each character as special
             if char_type == "CHARACTER":
                 if current_chunk and current_type != "CHARACTER":
-                    pattern_chunks.append((current_type, ''.join(current_chunk)))
+                    pattern_chunks.append((current_type, "".join(current_chunk)))
                     current_chunk = []
                 current_chunk.append(char)
                 current_type = char_type
             else:
                 if current_chunk:
-                    pattern_chunks.append((current_type, ''.join(current_chunk)))
+                    pattern_chunks.append((current_type, "".join(current_chunk)))
                 pattern_chunks.append((char_type, char))
                 current_chunk = []
                 current_type = char_type
 
         # Add the last chunk
         if current_chunk:
-            pattern_chunks.append((current_type, ''.join(current_chunk)))
+            pattern_chunks.append((current_type, "".join(current_chunk)))
 
         # Convert chunks to regex
         for chunk_type, chunk_content in pattern_chunks:
@@ -112,132 +112,147 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geometry)
         icon = QIcon("_internal\\icon\\app.ico")
         self.restoreGeometry(geometry)
-        self.initialize_theme('_internal\\theme_files\\dark.qss')
+        self.initialize_theme("_internal\\theme_files\\dark.qss")
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle('File Mover')
+        self.setWindowTitle("Dynamic File Mover")
         self.create_menu_bar()
 
     def initUI(self):
         central_widget = QWidget()
-        main_layout = QVBoxLayout(central_widget)
-    
+        main_layout = QHBoxLayout(central_widget)  # Changed to QHBoxLayout for side-by-side arrangement
+        
+        # Statusbar
+        self.statusbar = QStatusBar()
+        self.statusbar.setSizeGripEnabled(False)
+
+        # Group box for File View (left side)
+        file_view_groupbox = QGroupBox("File Content View")
+        file_view_layout = QVBoxLayout()
+
         # Input paths layout
         horizontal_layout_a = QHBoxLayout()
         self.file_path_input = QLineEdit(self)
-        self.file_path_input.setPlaceholderText('Enter the path to the text file which contains file paths...')
+        self.file_path_input.setPlaceholderText("Browse the directory to the file for reading...")
+        self.file_path_input.setReadOnly(True)
         horizontal_layout_a.addWidget(self.file_path_input)
-    
-        self.browse_button = QPushButton('Browse File', self)
+
+        self.browse_button = QPushButton("Browse File", self)
         self.browse_button.clicked.connect(self.browse_file)
         horizontal_layout_a.addWidget(self.browse_button)
-        main_layout.addLayout(horizontal_layout_a)
-    
+        file_view_layout.addLayout(horizontal_layout_a)
+
         horizontal_layout_b = QHBoxLayout()
         self.destination_input = QLineEdit(self)
-        self.destination_input.setPlaceholderText('Enter the destination directory where the files should be moved to...')
+        self.destination_input.setPlaceholderText("Browse the destination directory where the files should be moved to...")
+        self.destination_input.setReadOnly(True)
         horizontal_layout_b.addWidget(self.destination_input)
-    
-        self.set_folder_button = QPushButton('Set Folder', self)
+
+        self.set_folder_button = QPushButton("Set Folder", self)
         self.set_folder_button.clicked.connect(self.browse_folder)
         horizontal_layout_b.addWidget(self.set_folder_button)
-        main_layout.addLayout(horizontal_layout_b)
-        
+        file_view_layout.addLayout(horizontal_layout_b)
+
         # Log file dates combobox
         self.log_dates_combobox = QComboBox(self)
-        self.log_dates_combobox.setMinimumWidth(100)
-        self.log_dates_combobox.currentTextChanged.connect(lambda:self.extract_lines_by_date_and_display(self.extract_data_from_log(self.file_path_input.text()), self.log_dates_combobox.currentText()))
-    
-        # Horizontal Layout Row 3
+        self.log_dates_combobox.setToolTip("Select a date to view the log entries for that date.\nThis will re-display the log entries for the selected date in the file view.")
+        self.log_dates_combobox.setMinimumWidth(80)
+        self.log_dates_combobox.currentTextChanged.connect(lambda: self.extract_lines_by_date_and_display(
+            self.extract_data_from_log(self.file_path_input.text()), 
+            self.log_dates_combobox.currentText()
+        ))
+
+        # Horizontal Layout for Regex and Replace
         horizontal_layout_d = QHBoxLayout()
-        
-        # Move button
-        self.move_button = QPushButton('Move Files', self)
-        self.move_button.clicked.connect(self.move_files)
-        
-        # Input for regex pattern to search
         self.regex_pattern_input = QLineEdit(self)
-        self.regex_pattern_input.setPlaceholderText('Enter string to convert to regex pattern to search file...')
-        self.regex_pattern_input.setToolTip('Enter a regex pattern to search for in the file content.')
-        self.search_file_button = QPushButton('Generate', self)
+        self.regex_pattern_input.setPlaceholderText("Enter string to convert to regex pattern to search file...")
+        self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the file content.")
+        self.regex_pattern_input.setClearButtonEnabled(True)
+        self.search_file_button = QPushButton("Convert", self)
         self.search_file_button.clicked.connect(self.generate_regex)
-        self.parse_file = QPushButton("Parse", self)
-        self.parse_file.clicked.connect(self.search_content)
-        
-        self.find_in_file_input = QLineEdit(self)
-        self.replace_in_file_input = QLineEdit(self)
-        self.find_in_file_input.setPlaceholderText('Enter string to find in file content...')
-        self.replace_in_file_input.setPlaceholderText('Enter string to replace in file content...')
-        
-        main_layout.addLayout(horizontal_layout_d)
+        self.parse_file = QPushButton("Search", self)
+        self.parse_file.clicked.connect(self.search_and_replace_file_content)
         horizontal_layout_d.addWidget(self.regex_pattern_input)
         horizontal_layout_d.addWidget(self.search_file_button)
         horizontal_layout_d.addWidget(self.parse_file)
-        horizontal_layout_d.addWidget(self.find_in_file_input)
-        horizontal_layout_d.addWidget(self.replace_in_file_input)
-        horizontal_layout_d.addWidget(self.move_button) 
-    
-        # Horizontal layout for File View and Program Output
-        horizontal_layout_c = QHBoxLayout()
-    
-        # Group box for File View
-        file_view_groupbox = QGroupBox("File View")
-        file_view_layout = QVBoxLayout()
+
+        horizontal_layout_e = QHBoxLayout()
+        self.find_string_input = QLineEdit(self)
+        self.find_string_input.setPlaceholderText("Enter text to replace (e.g., ./lib/)")
+        self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the file content display.")
+        self.find_string_input.setClearButtonEnabled(True)
+        self.replace_string_input = QLineEdit(self)
+        self.replace_string_input.setPlaceholderText("Replace text in file content with (e.g., D:/Lobster_data/lib/)")
+        self.replace_string_input.setToolTip("Enter the text to replace the found text with in the file content display.")
+        self.replace_string_input.setClearButtonEnabled(True)
+        self.phrase_to_remove_input = QLineEdit(self)
+        self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove comma-separated (e.g., Marking file, to be deleted on exit of JVM)")
+        self.phrase_to_remove_input.setToolTip("Enter phrases to remove from the file content.\nCan be comma-separated (eg., Marking file, to be deleted on exit of JVM).")
+        self.phrase_to_remove_input.setClearButtonEnabled(True)
+        self.apply_button = QPushButton("Apply", self)
+        self.apply_button.setToolTip("Apply the changes to the file content.")
+        self.apply_button.clicked.connect(self.apply_and_replace_file_content)
+        horizontal_layout_e.addWidget(self.find_string_input)
+        horizontal_layout_e.addWidget(self.replace_string_input)
+        horizontal_layout_e.addWidget(self.phrase_to_remove_input)
+        horizontal_layout_e.addWidget(self.apply_button)
+
+        # File View Content
         file_view_horizontal_layout = QHBoxLayout()
-    
-        font_size_List = ["12px", "14px", "16px", "18px", "20px"]
+        font_size_list = ["12px", "14px", "16px", "18px", "20px"]
         self.file_view_label = QLabel("Font Size:", self)
         self.file_view_combobox = QComboBox()
-        self.file_view_combobox.setMinimumWidth(100)
+        self.file_view_combobox.setMinimumWidth(55)
         self.file_view_combobox.setCurrentText("12px")
-        self.file_view_combobox.addItems(font_size_List)
-        self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(f"font-size: {self.file_view_combobox.currentText()}"))
-    
-        self.file_content_display = QTextEdit(self)
-        self.file_content_display.setReadOnly(True)
-        self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
+        self.file_view_combobox.addItems(font_size_list)
+        self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(
+            f"font-size: {self.file_view_combobox.currentText()}"
+        ))
+        self.move_button = QPushButton("Move Files", self)
+        self.move_button.setToolTip("Move the files to the destination directory.")
+        self.move_button.clicked.connect(self.move_files)
 
         file_view_horizontal_layout.addWidget(QLabel("Log Date:", self))
         file_view_horizontal_layout.addWidget(self.log_dates_combobox)
         file_view_horizontal_layout.addWidget(self.file_view_label)
         file_view_horizontal_layout.addWidget(self.file_view_combobox)
-        file_view_horizontal_layout.addStretch()
+        file_view_horizontal_layout.addWidget(self.move_button)
+        file_view_horizontal_layout.addWidget(self.statusbar)
+        #file_view_horizontal_layout.addStretch()
+
+        self.file_content_display = QTextEdit(self)
+        self.file_content_display.setReadOnly(False)
+        self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
+
+        file_view_layout.addLayout(horizontal_layout_d)
         file_view_layout.addLayout(file_view_horizontal_layout)
+        file_view_layout.addLayout(horizontal_layout_e)
         file_view_layout.addWidget(self.file_content_display)
         file_view_groupbox.setLayout(file_view_layout)
-        horizontal_layout_c.addWidget(file_view_groupbox)
-    
-        # Group box for Program Output
+        main_layout.addWidget(file_view_groupbox)
+
+        # Group box for Program Output (right side)
         program_output_groupbox = QGroupBox("Program Output")
         program_output_layout = QVBoxLayout()
         program_output_horizontal_layout = QHBoxLayout()
-    
         self.font_size_label = QLabel("Font Size:", self)
         self.font_size_combobox = QComboBox()
-        self.font_size_combobox.setMinimumWidth(100)
+        self.font_size_combobox.setMinimumWidth(55)
         self.font_size_combobox.setCurrentText("12px")
-        self.font_size_combobox.addItems(font_size_List)
+        self.font_size_combobox.addItems(font_size_list)
         self.font_size_combobox.currentIndexChanged.connect(lambda: self.program_output.setStyleSheet(f"font-size: {self.font_size_combobox.currentText()}"))
-    
         self.program_output = QTextEdit(self)
         self.program_output.setReadOnly(True)
         self.program_output.setWordWrapMode(QTextOption.ManualWrap)
-
         program_output_horizontal_layout.addWidget(self.font_size_label)
         program_output_horizontal_layout.addWidget(self.font_size_combobox)
         program_output_horizontal_layout.addStretch()
         program_output_layout.addLayout(program_output_horizontal_layout)
         program_output_layout.addWidget(self.program_output)
+        program_output_groupbox.setMaximumWidth(500)
         program_output_groupbox.setLayout(program_output_layout)
-        horizontal_layout_c.addWidget(program_output_groupbox)
-    
-        main_layout.addLayout(horizontal_layout_c)
-        
-        # Statusbar label
-        self.statusbar = QStatusBar()
-        self.statusbar.setSizeGripEnabled(False)
-        main_layout.addWidget(self.statusbar)
-    
+        main_layout.addWidget(program_output_groupbox)
+
         self.setCentralWidget(central_widget)
 
     def create_menu_bar(self):
@@ -274,29 +289,87 @@ class MainWindow(QMainWindow):
 
         self.change_word_wrap_action.toggled.connect(self.change_word_wrap)
         view_menu.addAction(self.change_word_wrap_action)
-        
-        # Help menu
-        #help_menu = menubar.addMenu("&Help")
-        #how_to_use_action = QAction("How to Use", self)
-        #help_menu.addAction(how_to_use_action)
-        
-    def search_content(self):
-        # TODO Start with open with to get the actually fine content isntead of the displayed one
-        file_view_content = self.file_content_display.toPlainText()
-        regex_input = self.regex_pattern_input.text()
-        if len(regex_input) > 0:
-            matches = re.findall(regex_input, file_view_content)
-            if len(matches) > 0:
-                self.program_output.clear()
-                self.program_output.append(f"Found {len(matches)} matches for the regex pattern '{regex_input}' in the file content.")
-                # matches in a touple --> double values, can't use it that way
-                # TODO Add with open(file_name, "r") as file but try to mark the lines that match in the file_view_content
-                for match1,match2 in matches:
-                    self.program_output.append(match1)
+    
+    def search_and_replace_file_content(self):
+        try:
+            file_view_content = self.file_content_display.toPlainText()
+            regex_input = self.regex_pattern_input.text()
+
+            if len(regex_input) > 0:
+                # Compile the regex for better performance
+                regex = re.compile(regex_input)
+
+                # Split the content into lines
+                lines = file_view_content.splitlines()
+
+                # Find and clean lines that match the regex
+                matching_lines = []
+                for line in lines:
+                    if regex.search(line):
+                        try:
+                            # Clean up the date from the line
+                            cleaned_line = re.sub(r"^\d{2}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}\s+", "", line)
+                        except Exception:
+                            cleaned_line = line
+                        matching_lines.append(cleaned_line)
+
+                if matching_lines:
+                    self.program_output.clear()
+                    self.file_content_display.clear()
+                    self.program_output.append(f"Found {len(matching_lines)} matching lines for the regex pattern '{regex_input}':")
+                    self.statusbar.showMessage(f"Found {len(matching_lines)} matching lines.", 10000)
+                    # Display each cleaned line
+                    for line in matching_lines:
+                        self.file_content_display.append(line)
+                else:
+                    self.program_output.clear()
+                    self.program_output.append(f"No matching lines found for the regex pattern '{regex_input}'.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while searching and replacing the file content: {str(ex)}")
+
+    def apply_and_replace_file_content(self):
+        try:
+            # Get content and user inputs
+            file_view_content = self.file_content_display.toPlainText()
+            phrase_to_remove = self.phrase_to_remove_input.text()  # Phrases to remove (comma-separated)
+            original_phrase = self.find_string_input.text()  # Phrase to find
+            replacement_phrase = self.replace_string_input.text()  # Phrase to replace with
+
+            lines = file_view_content.splitlines()
+            cleaned_lines = []
+
+            for line in lines:
+                # Clean and replace each line
+                cleaned_line = self.clean_line(line, phrase_to_remove, original_phrase, replacement_phrase)
+                cleaned_lines.append(cleaned_line)
+
+            if cleaned_lines:
+                # Clear the display and show the updated content
+                self.statusbar.showMessage("Applied changes to the file content.", 10000)
+                self.file_content_display.clear()
+                self.file_content_display.setPlainText("\n".join(cleaned_lines))
             else:
                 self.program_output.clear()
-                self.program_output.append(f"No matches found for the regex pattern '{regex_input}' in the file content.")
-        
+
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while searching and replacing the file content: {str(ex)}")
+
+    
+    def clean_line(self, line, phrase_to_remove, original_phrase, replacement_phrase):
+        # Remove user-specified phrases
+        if phrase_to_remove:
+            splitted_phrase = phrase_to_remove.split(",")
+            for phrase in splitted_phrase:
+                phrase = phrase.strip()  # Remove leading/trailing spaces
+                if phrase:  # Ensure it"s not an empty string
+                    line = re.sub(re.escape(phrase) + r"\s*", "", line)
+
+        # Replace the original phrase with the replacement phrase
+        if original_phrase and replacement_phrase:
+            line = line.replace(original_phrase, replacement_phrase)
+
+        return line
+
     def change_word_wrap(self):
         file_content_wrap_mode = self.file_content_display.wordWrapMode()
         program_output_wrap_mode = self.program_output.wordWrapMode()
@@ -333,14 +406,17 @@ class MainWindow(QMainWindow):
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
             QMessageBox.critical(self, "Error", message)
             
-    def clean_file(self, file_path):
-        with open(file_path, 'r') as file:
-            lines = file.readlines()       
-        # Remove single quotes from each line
-        cleaned_lines = [line.replace("'", "") for line in lines]      
-        # Write the cleaned lines back to the file
-        with open(file_path, 'w') as file:
-            file.writelines(cleaned_lines)
+    def clean_paths_in_line(self, file_content_display_text):
+        try:
+            file_content_display_text = self.file_content_display.toPlainText()
+            lines = file_content_display_text.splitlines()
+
+            # Remove single quotes from each line
+            cleaned_lines = [line.replace("'", "") for line in lines]      
+            return cleaned_lines
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while cleaning high commas ' in the paths: {str(ex)}")
+        
     
     def generate_regex(self):
         try:
@@ -359,14 +435,12 @@ class MainWindow(QMainWindow):
         date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
         dates = set(re.findall(date_pattern, log_content))
         date_format = "%d.%m.%y"
-        dates_datetime = [datetime.strptime(date, date_format
-                                            )  for date in dates]
+        dates_datetime = [datetime.strptime(date, date_format) for date in dates]
         # Sort the datetime objects
         dates_datetime_sorted = sorted(dates_datetime)
         # Convert datetime objects back to strings
         dates_sorted = [datetime.strftime(date, date_format) for date in dates_datetime_sorted]
-        print(dates_sorted)
-        print("A")
+
         return dates_sorted
     
     def extract_lines_by_date_and_display(self, log_content, selected_date):
@@ -386,7 +460,7 @@ class MainWindow(QMainWindow):
     def extract_data_from_log(self, file_path):
         try:
             if file_path:
-                with open(file_path, 'r') as file:
+                with open(file_path, "r") as file:
                     file_data = file.read()
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
@@ -395,25 +469,26 @@ class MainWindow(QMainWindow):
     def browse_file(self):
         try:
             file_dialog = QFileDialog(self)
-            file_path, _ = file_dialog.getOpenFileName(self, 'Open File', '', 'Log Files (*.log)')
+            file_path, _ = file_dialog.getOpenFileName(self, "Open File", "", "Log Files (*.log)")
             if file_path:
                 self.file_content_display.clear()
                 self.file_path_input.setText(file_path)
-                with open(file_path, 'r') as file:
+                with open(file_path, "r") as file:
                     file_data = file.read()
                     self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
-                self.statusbar.showMessage("Loaded log file successfully.")
+                self.statusbar.setStyleSheet("color: #2cde85")
+                self.statusbar.showMessage("Loaded log file successfully.", 8000)
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(ex)}")
 
     def get_line_count(self, file_path):
-        with open(file_path, 'r') as file:
+        with open(file_path, "r") as file:
             lines = file.readlines()
             return len(lines)
     
     def browse_folder(self):
         folder_dialog = QFileDialog(self)
-        folder_path = folder_dialog.getExistingDirectory(self, 'Select Folder')
+        folder_path = folder_dialog.getExistingDirectory(self, "Select Folder")
         if folder_path:
             self.destination_input.setText(folder_path)
 
@@ -425,6 +500,7 @@ class MainWindow(QMainWindow):
             self.program_output.clear()
             file_path = self.file_path_input.text()
             destination = self.destination_input.text()
+            text_containing_file_paths = self.file_content_display.toPlainText()
             if not file_path or not destination:
                 self.statusbar.setStyleSheet("color: red")
                 self.statusbar.showMessage("Please provide both file path and destination directory.", 7000)
@@ -432,49 +508,46 @@ class MainWindow(QMainWindow):
 
             check_path_string_delimiter = ["/", "\\"]
             task_completed_message = "Moving task completed successfully."
-            self.statusbar.setStyleSheet("color: white")
+            self.statusbar.setStyleSheet("color: #2cde85")
             line_count = 1
             err_count = 0
             warn_count = 0
 
             try:
-                with open(file_path, 'r') as file:
-                    lines = file.readlines()
-                    total_lines = len(lines)
-                    for line in lines:
-                        file_to_move = line.strip()
-                        if file_to_move:
-                            # Get the file name with its immediate parent directory
-                            if check_path_string_delimiter[0] in file_to_move:  # Forward slash
-                                sub_dir = '/'.join(file_to_move.split('/')[-2:])  # Gets "lib/filename.jar"
-                            elif check_path_string_delimiter[1] in file_to_move:  # Backslash
-                                sub_dir = '\\'.join(file_to_move.split('\\')[-2:])  # Gets "lib\filename.jar"
-
-                            # Create the full destination path
-                            current_destination = os.path.join(destination, sub_dir)
-                            # Ensure the destination directory exists
-                            os.makedirs(os.path.dirname(current_destination), exist_ok=True)
-
-                            try:
-                                shutil.move(file_to_move, current_destination)
-                                self.program_output.append(f'Moved <span style="color: #197cff">{file_to_move}</span> to <span style="color: green">{current_destination}</span>')
-                                self.statusbar.showMessage(f'Moved {line_count}/{total_lines} files.')
-                            except FileNotFoundError:
-                                self.program_output.append(f'<span style="color: orange">WARN: {file_to_move}</span> not found, skipping.')
-                                warn_count += 1
-                                continue
-                            except shutil.Error as e:
-                                self.program_output.append(f'<span style="color: red">ERROR: {e}</span>')
-                                err_count += 1
-                                continue
-                            line_count += 1
-                    self.program_output.append(f"\n=======================\n{task_completed_message}\n=======================")
-                    if err_count > 0:
-                        self.program_output.append(f'<span style="color: red">ERROR: {err_count} files failed to move.</span>')
-                    if warn_count > 0:
-                        self.program_output.append(f'<span style="color: orange">WARNING: {warn_count} files were not found.</span>')
+                lines = self.clean_paths_in_line(text_containing_file_paths)
+                total_lines = len(lines)
+                for line in lines:
+                    file_to_move = line.strip()
+                    if file_to_move:
+                        # Get the file name with its immediate parent directory
+                        if check_path_string_delimiter[0] in file_to_move:  # Forward slash
+                            sub_dir = "/".join(file_to_move.split("/")[-2:])  # Gets "lib/filename.jar"
+                        elif check_path_string_delimiter[1] in file_to_move:  # Backslash
+                            sub_dir = "\\".join(file_to_move.split("\\")[-2:])  # Gets "lib\filename.jar"
+                        # Create the full destination path
+                        current_destination = os.path.join(destination, sub_dir)
+                        # Ensure the destination directory exists
+                        os.makedirs(os.path.dirname(current_destination), exist_ok=True)
+                        try:
+                            shutil.move(file_to_move, current_destination)
+                            self.program_output.append(f"Moved <span style='color: #197cff'>{file_to_move}</span> to <span style='color: green'>{current_destination}</span>")
+                            self.statusbar.showMessage(f"Moved {line_count}/{total_lines} files.", 10000)
+                        except FileNotFoundError:
+                            self.program_output.append(f"<span style='color: orange'>WARN: {file_to_move}</span> not found, skipping.")
+                            warn_count += 1
+                            continue
+                        except shutil.Error as e:
+                            self.program_output.append(f"<span style='color: red'>ERROR: {e}</span>")
+                            err_count += 1
+                            continue
+                        line_count += 1
+                self.program_output.append(f"\n=======================\n{task_completed_message}\n=======================\n")
+                if err_count > 0:
+                    self.program_output.append(f"<span style='color: red'>ERROR: {err_count} files failed to move.</span>")
+                if warn_count > 0:
+                    self.program_output.append(f"<span style='color: orange'>WARNING: {warn_count} files were not found.</span>")
             except Exception as e:
-                self.program_output.append(f'<span style="color: red">ERROR: {e}</span>')
+                self.program_output.append(f"<span style='color: red'>ERROR: {e}</span>")
             
     def initialize_theme(self, theme_file):
         try:
@@ -493,7 +566,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("geometry", geometry)
         super(MainWindow, self).closeEvent(event)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     ex = MainWindow()
     ex.show()
