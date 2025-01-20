@@ -612,7 +612,7 @@ class MainWindow(QMainWindow):
             response.raise_for_status()
             latest_release = response.json()
             latest_version = latest_release["tag_name"]
-
+    
             if self.version < latest_version:
                 download_url = latest_release["html_url"]
                 QMessageBox.information(self, "Update Available",
