@@ -2,16 +2,14 @@ import sys
 import shutil
 import os
 import re
+import requests
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 from datetime import datetime
 
-# //TODO Add feature to get "Marking file ..." lines and extract their file paths
-# //TODO Add input field for user to create replace ./lib/ with D:/Lobster_data/lib/ for example
-# // TODO Add input for string to replace from - to
-# // TODO Add input to search for regex pattern and replace all text in self.file_content_display with the found pattern
 
+# Regex Generator class to convert string to regex pattern
 class RegexGenerator:
     def __init__(self, string_pattern_to_detect):
         self.string_pattern_to_detect = string_pattern_to_detect
@@ -115,7 +113,8 @@ class MainWindow(QMainWindow):
         self.initialize_theme("_internal\\theme_files\\dark.qss")
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle("Dynamic File Mover")
+        self.setWindowTitle("FileSculptor v1.0")
+        self.version = "1.0"
         self.create_menu_bar()
 
     def initUI(self):
@@ -252,7 +251,7 @@ class MainWindow(QMainWindow):
         program_output_horizontal_layout.addStretch()
         program_output_layout.addLayout(program_output_horizontal_layout)
         program_output_layout.addWidget(self.program_output)
-        program_output_groupbox.setMaximumWidth(600)
+        program_output_groupbox.setMaximumWidth(650)
         program_output_groupbox.setLayout(program_output_layout)
         main_layout.addWidget(program_output_groupbox)
 
@@ -268,10 +267,15 @@ class MainWindow(QMainWindow):
         clear_action = QAction("Clear Program Output", self)
         clear_action.triggered.connect(lambda: self.program_output.clear())
         file_menu.addAction(clear_action)
+        
+        check_updates_action = QAction("Check for Updates", self)
+        check_updates_action.triggered.connect(self.check_for_updates)
+        file_menu.addAction(check_updates_action)
 
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+        
         
         # Open Menu
         open_menu = menubar.addMenu("&Open")
@@ -292,6 +296,17 @@ class MainWindow(QMainWindow):
 
         self.change_word_wrap_action.toggled.connect(self.change_word_wrap)
         view_menu.addAction(self.change_word_wrap_action)
+        
+        # Edit Menu
+        # edit_menu = menubar.addMenu("&Edit")
+        # 
+        # undo_action = QAction("Undo", self)
+        # undo_action.triggered.connect(self.file_content_display.undo)
+        # edit_menu.addAction(undo_action)
+        # 
+        # redo_action = QAction("Redo", self)
+        # redo_action.triggered.connect(self.file_content_display.redo)
+        # edit_menu.addAction(redo_action)
     
     def search_and_replace_file_content(self):
         try:
@@ -463,20 +478,22 @@ class MainWindow(QMainWindow):
             if file_path:
                 with open(file_path, "r") as file:
                     file_data = file.read()
+                return file_data
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
-        return file_data
         
     def browse_file(self):
         try:
             file_dialog = QFileDialog(self)
-            file_path, _ = file_dialog.getOpenFileName(self, "Open File", "", "Log Files (*.log)")
+            file_path, _ = file_dialog.getOpenFileName(self, "Open File", "", "Log Files (*.log), Text Files (*.txt)")
             if file_path:
                 self.file_content_display.clear()
                 self.file_path_input.setText(file_path)
                 with open(file_path, "r") as file:
                     file_data = file.read()
                     self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
+                    last_item_index = self.log_dates_combobox.count() - 1
+                    self.log_dates_combobox.setCurrentIndex(last_item_index) # Use the last item in the list
                 self.statusbar.setStyleSheet("color: #2cde85")
                 self.statusbar.showMessage("Loaded log file successfully.", 8000)
         except Exception as ex:
@@ -494,18 +511,33 @@ class MainWindow(QMainWindow):
             self.destination_input.setText(folder_path)
 
     def move_files(self):
-        reply = QMessageBox.warning(self, "Warning", "Are you sure you want to move the files?", QMessageBox.Yes | QMessageBox.No)
+        reply = QMessageBox.information(self, "Move files", "Are you sure you want to move the files?", QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.No:
             return
         else:
             self.program_output.clear()
             file_path = self.file_path_input.text()
             destination = self.destination_input.text()
-            text_containing_file_paths = self.file_content_display.toPlainText()
-            if not file_path or not destination:
+            
+            
+            if not destination:
                 self.statusbar.setStyleSheet("color: red")
-                self.statusbar.showMessage("Please provide both file path and destination directory.", 7000)
+                self.statusbar.showMessage("Please provide a destination directory.", 10000)
                 return
+            
+            if not file_path:
+                reply = QMessageBox.warning(self, "No file path provided", "No file path has been provided. Do you want to continue?\nThe displayed file content will be used.", QMessageBox.Yes | QMessageBox.No)
+                if reply == QMessageBox.No:
+                    return
+                else:
+                    text_containing_file_paths = self.file_content_display.toPlainText()
+                    if not text_containing_file_paths:
+                        self.statusbar.setStyleSheet("color: red")
+                        self.statusbar.showMessage("No file content to use for moving files.", 10000)
+                        return
+                    else:
+                        self.statusbar.setStyleSheet("color: #2cde85")
+                        self.statusbar.showMessage("Using the displayed file content.", 10000)
 
             check_path_string_delimiter = ["/", "\\"]
             task_completed_message = "Moving task completed successfully."
@@ -569,6 +601,29 @@ class MainWindow(QMainWindow):
         geometry = self.saveGeometry()
         self.settings.setValue("geometry", geometry)
         super(MainWindow, self).closeEvent(event)
+        
+    def check_for_updates(self):
+        repo_owner = "zaricj"
+        repo_name = "FileSculptor"
+        api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+        
+        try:
+            response = requests.get(api_url)
+            response.raise_for_status()
+            latest_release = response.json()
+            latest_version = latest_release["tag_name"]
+
+            if self.version < latest_version:
+                download_url = latest_release["html_url"]
+                QMessageBox.information(self, "Update Available",
+                                        f"A new version ({latest_version}) is available.\n"
+                                        f"Visit {download_url} to download the latest version.")
+            else:
+                QMessageBox.information(self, "No Updates",
+                                        "You are using the latest version.")
+        except requests.RequestException as e:
+            QMessageBox.critical(self, "Error",
+                                 f"An error occurred while checking for updates:\n{str(e)}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
