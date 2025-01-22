@@ -283,6 +283,7 @@ class MainWindow(QMainWindow):
 
         self.file_content_display = QTextEdit()
         self.file_content_display.setReadOnly(False)
+        self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
         
         # Progressbar
         self.progressbar = QProgressBar()
@@ -309,6 +310,7 @@ class MainWindow(QMainWindow):
 
         self.program_output = QTextEdit()
         self.program_output.setReadOnly(True)
+        self.program_output.setWordWrapMode(QTextOption.ManualWrap)
         
         output_layout.addLayout(output_toolbar)
         output_layout.addWidget(self.program_output)
@@ -457,7 +459,6 @@ class MainWindow(QMainWindow):
     def change_word_wrap(self):
         file_content_wrap_mode = self.file_content_display.wordWrapMode()
         program_output_wrap_mode = self.program_output.wordWrapMode()
-        print(file_content_wrap_mode, program_output_wrap_mode)
         
         if self.change_word_wrap_action.isChecked():
             self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
