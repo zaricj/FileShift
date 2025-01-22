@@ -3,7 +3,10 @@ import shutil
 import os
 import re
 import requests
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy
+import py7zr
+import subprocess
+from pathlib import Path
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy, QGridLayout, QSplitter, QTabWidget, QProgressBar
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 from datetime import datetime
@@ -103,6 +106,7 @@ class RegexGenerator:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.version = "1.1.0" # Current version of the application
         # Settings to save current location of the windows on exit
         self.settings = QSettings("Application", "Name")
         geometry = self.settings.value("geometry", bytes())
@@ -113,148 +117,212 @@ class MainWindow(QMainWindow):
         self.initialize_theme("_internal\\theme_files\\dark.qss")
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle("FileSculptor v1.0")
-        self.version = "1.0"
+        self.setWindowTitle(f"FileSculptor v{self.version}")
         self.create_menu_bar()
 
     def initUI(self):
         central_widget = QWidget()
-        main_layout = QHBoxLayout(central_widget)  # Changed to QHBoxLayout for side-by-side arrangement
+        main_layout = QHBoxLayout(central_widget)  # Main layout is horizontal
         
-        # Statusbar
+        # Status Bar
         self.statusbar = QStatusBar()
         self.statusbar.setSizeGripEnabled(False)
+        self.statusbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # Group box for File View (left side)
-        file_view_groupbox = QGroupBox("File Content View")
-        file_view_layout = QVBoxLayout()
+        # Left Panel - Controls
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # File Operations Panel
+        file_ops_group = QGroupBox("File Operations")
+        file_ops_group.setMinimumWidth(550)
+        file_ops_layout = QVBoxLayout()
 
-        # Input paths layout
-        horizontal_layout_a = QHBoxLayout()
-        self.file_path_input = QLineEdit(self)
-        self.file_path_input.setPlaceholderText("Browse the directory to the file for reading...")
+        # Input file selection with icon
+        file_input_layout = QHBoxLayout()
+        self.file_path_input = QLineEdit()
+        self.file_path_input.setPlaceholderText("Browse for the file to read it's contents...")
         self.file_path_input.setReadOnly(True)
-        horizontal_layout_a.addWidget(self.file_path_input)
-
-        self.browse_button = QPushButton("Browse File", self)
+        self.browse_button = QPushButton("Browse File")
         self.browse_button.clicked.connect(self.browse_file)
-        horizontal_layout_a.addWidget(self.browse_button)
-        file_view_layout.addLayout(horizontal_layout_a)
+        file_input_layout.addWidget(self.file_path_input)
+        file_input_layout.addWidget(self.browse_button)
 
-        horizontal_layout_b = QHBoxLayout()
-        self.destination_input = QLineEdit(self)
+        # Destination selection with icon
+        dest_input_layout = QHBoxLayout()
+        self.destination_input = QLineEdit()
         self.destination_input.setPlaceholderText("Browse the destination directory where the files should be moved to...")
         self.destination_input.setReadOnly(True)
-        horizontal_layout_b.addWidget(self.destination_input)
-
-        self.set_folder_button = QPushButton("Set Folder", self)
+        self.set_folder_button = QPushButton("Set Folder")
         self.set_folder_button.clicked.connect(self.browse_folder)
-        horizontal_layout_b.addWidget(self.set_folder_button)
-        file_view_layout.addLayout(horizontal_layout_b)
+        dest_input_layout.addWidget(self.destination_input)
+        dest_input_layout.addWidget(self.set_folder_button)
 
-        # Log file dates combobox
-        self.log_dates_combobox = QComboBox(self)
+        # Action buttons
+        action_layout = QHBoxLayout()
+        self.move_button = QPushButton("Move Files")
+        self.move_button.setToolTip("Move the files to the destination directory.")
+        self.move_button.clicked.connect(self.move_files)
+        
+        action_layout.addWidget(self.move_button)
+        #action_layout.addStretch()
+
+        file_ops_layout.addLayout(file_input_layout)
+        file_ops_layout.addLayout(dest_input_layout)
+        file_ops_layout.addLayout(action_layout)
+        file_ops_group.setLayout(file_ops_layout)
+        
+        # Search and Manipulation Panel
+        search_group = QGroupBox("Search and Manipulation")
+        search_group.setMinimumWidth(550)
+        search_layout = QVBoxLayout()
+
+        # Pattern search
+        pattern_layout = QVBoxLayout()
+        pattern_header = QHBoxLayout()
+        pattern_header.addWidget(QLabel("Search Pattern:"))
+        self.regex_pattern_input = QLineEdit()
+        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern to search the displayed file content...")
+        self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the displayed file content.")
+        self.regex_pattern_input.setClearButtonEnabled(True)
+        
+        pattern_buttons = QHBoxLayout()
+        self.convert_entered_string_to_regex_button = QPushButton("Convert to Regex")
+        self.convert_entered_string_to_regex_button.setToolTip("Convert the entered string to a regex pattern.")
+        self.convert_entered_string_to_regex_button.clicked.connect(self.generate_regex)
+        self.search_file_contents_and_display_button = QPushButton("Search")
+        self.search_file_contents_and_display_button.setToolTip("Search the displayed file content for the entered regex pattern and display only those matches.")
+        self.search_file_contents_and_display_button.clicked.connect(self.search_and_replace_file_content)
+        pattern_buttons.addWidget(self.convert_entered_string_to_regex_button)
+        pattern_buttons.addWidget(self.search_file_contents_and_display_button)
+        
+        pattern_layout.addLayout(pattern_header)
+        pattern_layout.addWidget(self.regex_pattern_input)
+        pattern_layout.addLayout(pattern_buttons)
+
+        # Text manipulation
+        manipulation_layout = QVBoxLayout()
+        
+        find_layout = QVBoxLayout()
+        find_layout.addWidget(QLabel("Find text:"))
+        self.find_string_input = QLineEdit()
+        self.find_string_input.setPlaceholderText("Enter text to replace (e.g., ./lib/)")
+        self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the displayed file content.\nExample: ./lib/")
+        self.find_string_input.setClearButtonEnabled(True)
+        find_layout.addWidget(self.find_string_input)
+
+        replace_layout = QVBoxLayout()
+        replace_layout.addWidget(QLabel("Replace text with:"))
+        self.replace_string_input = QLineEdit()
+        self.replace_string_input.setPlaceholderText("Replace text in file content with (e.g., D:/Lobster_data/lib/)")
+        self.replace_string_input.setToolTip("Enter the text to replace the found text within the displayed file content.\nExample: D:/Lobster_data/lib/")
+        replace_layout.addWidget(self.replace_string_input)
+
+        remove_layout = QVBoxLayout()
+        remove_layout.addWidget(QLabel("Remove phrases:"))
+        self.phrase_to_remove_input = QLineEdit()
+        self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove comma-separated (e.g., Marking file, to be deleted on exit of JVM)")
+        self.phrase_to_remove_input.setToolTip("Enter phrases to remove from the displayed file content.\nCan be comma-separated (eg., Marking file, to be deleted on exit of JVM).")
+        self.phrase_to_remove_input.setClearButtonEnabled(True)
+        remove_layout.addWidget(self.phrase_to_remove_input)
+
+        self.apply_button = QPushButton("Apply Changes")
+        self.apply_button.setToolTip("Apply the changes to the displayed file content.")
+        self.apply_button.clicked.connect(self.apply_and_replace_file_content)
+        
+        manipulation_layout.addLayout(find_layout)
+        manipulation_layout.addLayout(replace_layout)
+        manipulation_layout.addLayout(remove_layout)
+        manipulation_layout.addWidget(self.apply_button)
+
+        search_layout.addLayout(pattern_layout)
+        search_layout.addSpacing(10)
+        search_layout.addLayout(manipulation_layout)
+        search_group.setLayout(search_layout)
+
+        # Add panels to left layout
+        left_layout.addWidget(file_ops_group)
+        left_layout.addWidget(search_group)
+        left_layout.addStretch()
+
+        # Right Panel - Content Views
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # File Content View
+        content_group = QGroupBox("File Content")
+        content_layout = QVBoxLayout()
+
+        content_toolbar = QHBoxLayout()
+        self.log_dates_combobox = QComboBox()
         self.log_dates_combobox.setToolTip("Select a date to view the log entries for that date.\nThis will re-display the log entries for the selected date in the file view.")
-        self.log_dates_combobox.setMinimumWidth(85)
+        self.log_dates_combobox.setMinimumWidth(120)
         self.log_dates_combobox.currentTextChanged.connect(lambda: self.extract_lines_by_date_and_display(
             self.extract_data_from_log(self.file_path_input.text()), 
             self.log_dates_combobox.currentText()
         ))
+        self.font_size_combobox_file_contents = QComboBox()
+        self.font_size_combobox_file_contents.addItems(["12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_file_contents.setMinimumWidth(60)
+        
+        self.font_size_combobox_output = QComboBox()
+        self.font_size_combobox_output.addItems(["12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_output.setMinimumWidth(60)
+        
+        content_toolbar.addWidget(QLabel("Log Date:"))
+        content_toolbar.addWidget(self.log_dates_combobox)
+        content_toolbar.addSpacing(20)
+        content_toolbar.addWidget(QLabel("Font Size:"))
+        content_toolbar.addWidget(self.font_size_combobox_file_contents)
+        content_toolbar.addSpacing(20)
+        content_toolbar.addWidget(QLabel("Status:"))
+        content_toolbar.addWidget(self.statusbar)
+        #content_toolbar.addStretch()
 
-        # Horizontal Layout for Regex and Replace
-        horizontal_layout_d = QHBoxLayout()
-        self.regex_pattern_input = QLineEdit(self)
-        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern to search the file content...")
-        self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the file content.")
-        self.regex_pattern_input.setClearButtonEnabled(True)
-        self.convert_entered_string_to_regex_button = QPushButton("Convert", self)
-        self.convert_entered_string_to_regex_button.setToolTip("Convert the entered string to a regex pattern.")
-        self.convert_entered_string_to_regex_button.clicked.connect(self.generate_regex)
-        self.search_file_contents_and_display_button = QPushButton("Search", self)
-        self.search_file_contents_and_display_button.setToolTip("Search file content for the entered regex pattern and display only those matches.")
-        self.search_file_contents_and_display_button.clicked.connect(self.search_and_replace_file_content)
-        horizontal_layout_d.addWidget(self.regex_pattern_input)
-        horizontal_layout_d.addWidget(self.convert_entered_string_to_regex_button)
-        horizontal_layout_d.addWidget(self.search_file_contents_and_display_button)
-
-        horizontal_layout_e = QHBoxLayout()
-        self.find_string_input = QLineEdit(self)
-        self.find_string_input.setPlaceholderText("Enter text to replace (e.g., ./lib/)")
-        self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the file content display.\nExample: ./lib/")
-        self.find_string_input.setClearButtonEnabled(True)
-        self.replace_string_input = QLineEdit(self)
-        self.replace_string_input.setPlaceholderText("Replace text in file content with (e.g., D:/Lobster_data/lib/)")
-        self.replace_string_input.setToolTip("Enter the text to replace the found text with in the file content display.\n Example: D:/Lobster_data/lib/")
-        self.replace_string_input.setClearButtonEnabled(True)
-        self.phrase_to_remove_input = QLineEdit(self)
-        self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove comma-separated (e.g., Marking file, to be deleted on exit of JVM)")
-        self.phrase_to_remove_input.setToolTip("Enter phrases to remove from the file content.\nCan be comma-separated (eg., Marking file, to be deleted on exit of JVM).")
-        self.phrase_to_remove_input.setClearButtonEnabled(True)
-        self.apply_button = QPushButton("Apply", self)
-        self.apply_button.setToolTip("Apply the changes to the file content.")
-        self.apply_button.clicked.connect(self.apply_and_replace_file_content)
-        horizontal_layout_e.addWidget(self.find_string_input)
-        horizontal_layout_e.addWidget(self.replace_string_input)
-        horizontal_layout_e.addWidget(self.phrase_to_remove_input)
-        horizontal_layout_e.addWidget(self.apply_button)
-
-        # File View Content
-        file_view_horizontal_layout = QHBoxLayout()
-        font_size_list = ["12px", "14px", "16px", "18px", "20px"]
-        self.file_view_label = QLabel("Font Size:", self)
-        self.file_view_combobox = QComboBox()
-        self.file_view_combobox.setMinimumWidth(55)
-        self.file_view_combobox.setCurrentText("12px")
-        self.file_view_combobox.addItems(font_size_list)
-        self.file_view_combobox.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(
-            f"font-size: {self.file_view_combobox.currentText()}"
-        ))
-        self.move_button = QPushButton("Move Files", self)
-        self.move_button.setToolTip("Move the files to the destination directory.")
-        self.move_button.setMinimumWidth(100)
-        self.move_button.clicked.connect(self.move_files)
-
-        file_view_horizontal_layout.addWidget(QLabel("Log Date:", self))
-        file_view_horizontal_layout.addWidget(self.log_dates_combobox)
-        file_view_horizontal_layout.addWidget(self.file_view_label)
-        file_view_horizontal_layout.addWidget(self.file_view_combobox)
-        file_view_horizontal_layout.addWidget(self.move_button)
-        file_view_horizontal_layout.addWidget(self.statusbar)
-        #file_view_horizontal_layout.addStretch()
-
-        self.file_content_display = QTextEdit(self)
+        self.file_content_display = QTextEdit()
         self.file_content_display.setReadOnly(False)
-        self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
+        
+        # Progressbar
+        self.progressbar = QProgressBar()
+        self.progressbar.setMaximumHeight(15)
+        self.progressbar.setMinimumWidth(260)
+        self.progressbar.setVisible(False)
+        
+        content_layout.addLayout(content_toolbar)
+        content_layout.addWidget(self.file_content_display)
+        content_group.setLayout(content_layout)
 
-        file_view_layout.addLayout(horizontal_layout_d)
-        file_view_layout.addLayout(horizontal_layout_e)
-        file_view_layout.addLayout(file_view_horizontal_layout)
-        file_view_layout.addWidget(self.file_content_display)
-        file_view_groupbox.setLayout(file_view_layout)
-        main_layout.addWidget(file_view_groupbox)
+        # Program Output
+        output_group = QGroupBox("Program Output")
+        output_layout = QVBoxLayout()
 
-        # Group box for Program Output (right side)
-        program_output_groupbox = QGroupBox("Program Output")
-        program_output_layout = QVBoxLayout()
-        program_output_horizontal_layout = QHBoxLayout()
-        self.font_size_label = QLabel("Font Size:", self)
-        self.font_size_combobox = QComboBox()
-        self.font_size_combobox.setMinimumWidth(55)
-        self.font_size_combobox.setCurrentText("12px")
-        self.font_size_combobox.addItems(font_size_list)
-        self.font_size_combobox.currentIndexChanged.connect(lambda: self.program_output.setStyleSheet(f"font-size: {self.font_size_combobox.currentText()}"))
-        self.program_output = QTextEdit(self)
+        output_toolbar = QHBoxLayout()
+        output_toolbar.addWidget(QLabel("Font Size:"))
+        output_toolbar.addWidget(self.font_size_combobox_output)
+        output_toolbar.addSpacing(10)
+        output_toolbar.addWidget(QPushButton("Clear Output", clicked=lambda: self.program_output.clear()))
+        output_toolbar.addSpacing(10)
+        output_toolbar.addWidget(self.progressbar)
+        output_toolbar.addStretch()
+
+        self.program_output = QTextEdit()
         self.program_output.setReadOnly(True)
-        self.program_output.setWordWrapMode(QTextOption.ManualWrap)
-        program_output_horizontal_layout.addWidget(self.font_size_label)
-        program_output_horizontal_layout.addWidget(self.font_size_combobox)
-        program_output_horizontal_layout.addStretch()
-        program_output_layout.addLayout(program_output_horizontal_layout)
-        program_output_layout.addWidget(self.program_output)
-        program_output_groupbox.setMaximumWidth(650)
-        program_output_groupbox.setLayout(program_output_layout)
-        main_layout.addWidget(program_output_groupbox)
+        
+        output_layout.addLayout(output_toolbar)
+        output_layout.addWidget(self.program_output)
+        output_group.setLayout(output_layout)
 
+        # Add views to right layout
+        right_layout.addWidget(content_group, stretch=2)
+        left_layout.addWidget(output_group, stretch=1)
+
+        # Set up main layout
+        main_layout.addWidget(left_panel, stretch=1)
+        main_layout.addWidget(right_panel, stretch=2)
+
+        # Set central widget
         self.setCentralWidget(central_widget)
 
     def create_menu_bar(self):
@@ -464,11 +532,14 @@ class MainWindow(QMainWindow):
             line for line in log_content.splitlines() if line.startswith(selected_date)
         ]
         try:
-            if log_content:
-                self.file_content_display.clear()
-                self.program_output.setText(f"Loaded log entries for selected date {selected_date} in file view...")
-                for text_line in filtered_lines:
-                    self.file_content_display.append(text_line)
+            if self.log_dates_combobox.count() > 0:
+                if log_content:
+                    self.file_content_display.clear()
+                    self.program_output.setText(f"Loaded log entries for selected date {selected_date} in file view...")
+                    for text_line in filtered_lines:
+                        self.file_content_display.append(text_line)
+            else:
+                self.program_output.clear()
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while displaying the log entries: {str(ex)}")
         return filtered_lines
@@ -485,17 +556,29 @@ class MainWindow(QMainWindow):
     def browse_file(self):
         try:
             file_dialog = QFileDialog(self)
-            file_path, _ = file_dialog.getOpenFileName(self, "Open File", "", "Log Files (*.log), Text Files (*.txt)")
-            if file_path:
+            file_path, _ = file_dialog.getOpenFileNames(self, "Open File", "", "Log File (*.log);;Text File (*.txt)")
+            file_path = file_path[0]
+            file_extension = Path(file_path).suffix
+            if file_path and file_extension == ".log":
                 self.file_content_display.clear()
                 self.file_path_input.setText(file_path)
                 with open(file_path, "r") as file:
                     file_data = file.read()
                     self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
                     last_item_index = self.log_dates_combobox.count() - 1
-                    self.log_dates_combobox.setCurrentIndex(last_item_index) # Use the last item in the list
+                    self.log_dates_combobox.setCurrentIndex(last_item_index) # Load the last item in the list
                 self.statusbar.setStyleSheet("color: #2cde85")
                 self.statusbar.showMessage("Loaded log file successfully.", 8000)
+            elif file_path and file_extension == ".txt":
+                if self.log_dates_combobox.count() > 0:
+                    self.log_dates_combobox.clear()
+                self.file_content_display.clear()
+                self.file_path_input.setText(file_path)
+                with open(file_path, "r") as file:
+                    file_data = file.read()
+                    self.file_content_display.setPlainText(file_data)
+                self.statusbar.setStyleSheet("color: #2cde85")
+                self.statusbar.showMessage("Loaded text file successfully.", 8000)
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(ex)}")
 
@@ -606,24 +689,76 @@ class MainWindow(QMainWindow):
         repo_owner = "zaricj"
         repo_name = "FileSculptor"
         api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+        #token = "none"
         
+        #headers = {"Authorization": f"token {token}"}
+
         try:
-            response = requests.get(api_url)
+            response = requests.get(api_url) # Re-add headers=headers and add secret token
             response.raise_for_status()
             latest_release = response.json()
             latest_version = latest_release["tag_name"]
-    
-            if self.version < latest_version:
-                download_url = latest_release["html_url"]
-                QMessageBox.information(self, "Update Available",
-                                        f"A new version ({latest_version}) is available.\n"
-                                        f"Visit {download_url} to download the latest version.")
+
+            # Extract the browser_download_url
+            if "assets" in latest_release and len(latest_release["assets"]) > 0:
+                download_url = latest_release["assets"][0]["browser_download_url"]
             else:
-                QMessageBox.information(self, "No Updates",
-                                        "You are using the latest version.")
+                QMessageBox.critical(self, "Error", "No downloadable assets found in the latest release.")
+                return
+
+            if self.version < latest_version:
+                reply = QMessageBox.question(
+                    self,
+                    "Update Available",
+                    f"A new version ({latest_version}) is available.\nDo you want to download the update?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if reply == QMessageBox.Yes:
+                    self.progressbar.setVisible(True)
+                    self.program_output.append("Downloading update...")
+                    zip_path = f"{repo_name}.7z"
+                    with requests.get(download_url, stream=True, verify=False) as r:
+                        r.raise_for_status()
+                        total_size = int(r.headers.get('content-length', 0))
+                        downloaded = 0
+                        with open(zip_path, "wb") as file:
+                            for chunk in r.iter_content(chunk_size=8192):
+                                downloaded += len(chunk)
+                                file.write(chunk)
+                                progress = round((downloaded / total_size) * 100)
+                                self.progressbar.setValue(progress)
+
+                    # Unzip the downloaded file
+                    with py7zr.SevenZipFile(zip_path, mode='r') as archive:
+                        archive.extractall(path=f"{repo_name}_{latest_version}")
+
+                    # Check if the update was successful
+                    if os.path.exists(f"{repo_name}_{latest_version}"):
+                        updated_reply = QMessageBox.information(
+                            self,
+                            "Update Successful",
+                            f"The update has been downloaded and unzipped successfully.\nLocation: {os.path.abspath(f'{repo_name}_{latest_version}')}\n\nDo you want to restart the application?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                        if updated_reply == QMessageBox.Yes:
+                            # Clean up the zip file
+                            os.remove(zip_path)
+                            self.restart_application()
+                        else:
+                            os.remove(zip_path)
+                        self.progressbar.setVisible(False)
+                    else:
+                        QMessageBox.critical(self, "Update Failed", "The update could not be unzipped.")
+            else:
+                QMessageBox.information(self, "No Updates", "You are using the latest version.")
         except requests.RequestException as e:
-            QMessageBox.critical(self, "Error",
-                                 f"An error occurred while checking for updates:\n{str(e)}")
+            QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while extracting the update:\n{str(e)}")
+            
+    def restart_application(self):
+        """Restart the application."""
+        QApplication.quit()
+        subprocess.Popen([sys.executable] + sys.argv)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -6,8 +6,6 @@ QMainWindow {
 QWidget {
     background-color: #212121;
     color: #e2e2e2;
-    font-family: 'Segoe UI', sans-serif;
-    font-size: 12px;
 }
 
 QLabel {
@@ -108,12 +106,25 @@ QStatusBar:disabled {
     color: #b0b0b0;
 }
 
+QProgressBar {
+    background-color: #313338;
+    border: 1px solid #4a4a4a;
+    border-radius: 6px;
+    text-align: center;
+    color: #ffffff;
+    padding: 2px;
+}
+
+QProgressBar::chunk {
+    background-color: #3f51b5;
+}
+
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top center;
     font-size: 14px;
     font-weight: 600;
-    color: #ffffff;
+    color: #546cf7;
     letter-spacing: 0.8px;
 }
 
