@@ -264,11 +264,17 @@ class MainWindow(QMainWindow):
             self.log_dates_combobox.currentText()
         ))
         self.font_size_combobox_file_contents = QComboBox()
-        self.font_size_combobox_file_contents.addItems(["12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_file_contents.addItems(["10px","11px","12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_file_contents.setCurrentIndex(2)
+        self.font_size_combobox_file_contents.currentIndexChanged.connect(lambda: self.file_content_display.setStyleSheet(
+            f"font-size: {self.font_size_combobox_file_contents.currentText()}"))
         self.font_size_combobox_file_contents.setMinimumWidth(60)
         
         self.font_size_combobox_output = QComboBox()
-        self.font_size_combobox_output.addItems(["12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_output.addItems(["10px","11px","12px", "14px", "16px", "18px", "20px"])
+        self.font_size_combobox_output.setCurrentIndex(2)
+        self.font_size_combobox_output.currentIndexChanged.connect(lambda: self.program_output.setStyleSheet(
+            f"font-size: {self.font_size_combobox_output.currentText()}"))
         self.font_size_combobox_output.setMinimumWidth(60)
         
         content_toolbar.addWidget(QLabel("Log Date:"))
@@ -461,8 +467,6 @@ class MainWindow(QMainWindow):
         return line
 
     def change_word_wrap(self):
-        file_content_wrap_mode = self.file_content_display.wordWrapMode()
-        program_output_wrap_mode = self.program_output.wordWrapMode()
         
         if self.change_word_wrap_action.isChecked():
             self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
