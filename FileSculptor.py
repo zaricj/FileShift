@@ -11,7 +11,6 @@ from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 from datetime import datetime
 
-
 # Regex Generator class to convert string to regex pattern
 class RegexGenerator:
     def __init__(self, string_pattern_to_detect):
@@ -106,18 +105,19 @@ class RegexGenerator:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Initializing current working director and theme file(s)
+        current_working_dir = os.getcwd()
+        theme_file_path = os.path.join(current_working_dir,"_internal","theme_files")
+        dark_theme_file = os.path.join(theme_file_path,"dark.qss")
         self.version = "1.1.0" # Current version of the application
-        # Settings to save current location of the windows on exit
-        self.settings = QSettings("Application", "Name")
+        self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
-        if geometry:
-            self.restoreGeometry(geometry)
         icon = QIcon("_internal\\icon\\app.ico")
         self.restoreGeometry(geometry)
-        self.initialize_theme("_internal\\theme_files\\dark.qss")
+        self.initialize_theme(dark_theme_file)
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle(f"FileSculptor v{self.version}")
+        self.setWindowTitle(f"FileSculptor v{self.version} © - by Jovan")
         self.create_menu_bar()
 
     def initUI(self):
@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
         manipulation_layout = QVBoxLayout()
         
         find_layout = QVBoxLayout()
-        find_layout.addWidget(QLabel("Find text:"))
+        find_layout.addWidget(QLabel("Find text to replace:"))
         self.find_string_input = QLineEdit()
         self.find_string_input.setPlaceholderText("Enter text to replace (e.g., ./lib/)")
         self.find_string_input.setToolTip("Enter the text to find which will be replaced later in the displayed file content.\nExample: ./lib/")
@@ -337,10 +337,8 @@ class MainWindow(QMainWindow):
         clear_action = QAction("Clear Program Output", self)
         clear_action.triggered.connect(lambda: self.program_output.clear())
         file_menu.addAction(clear_action)
-        
-        check_updates_action = QAction("Check for Updates", self)
-        check_updates_action.triggered.connect(self.check_for_updates)
-        file_menu.addAction(check_updates_action)
+
+        file_menu.addSeparator()
 
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
@@ -366,6 +364,12 @@ class MainWindow(QMainWindow):
 
         self.change_word_wrap_action.toggled.connect(self.change_word_wrap)
         view_menu.addAction(self.change_word_wrap_action)
+        
+        # About Menu
+        about_menu = menubar.addMenu("&About")
+        check_updates_action = QAction("Check for Updates", self)
+        check_updates_action.triggered.connect(self.check_for_updates)
+        about_menu.addAction(check_updates_action)
         
         # Edit Menu
         # edit_menu = menubar.addMenu("&Edit")
