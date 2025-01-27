@@ -408,9 +408,14 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Changing path separator error", f"An error occurred while trying to change path separator: {str(ex)}")
     
     def enable_change_path_separator_button(self):
-        self.change_path_separator_button.setVisible(True)
-        if len(self.replace_string_input.text()) == 0:
-            self.change_path_separator_button.setVisible(False)
+        try:
+            text = self.replace_string_input.text()
+            if "/" in text or "\\" in text:
+                self.change_path_separator_button.setVisible(True)
+            else:
+                self.change_path_separator_button.setVisible(False)
+        except Exception as ex:
+            QMessageBox.critical(self, "An error occurred", f"An error has occurred, {str(ex)}")
     
     def search_and_replace_file_content(self):
         try:
@@ -499,13 +504,15 @@ class MainWindow(QMainWindow):
             self.file_content_display.setWordWrapMode(QTextOption.WordWrap)
             self.program_output.setWordWrapMode(QTextOption.WordWrap)
         
-    def open_file_helper_method(self, file_path):
+    def open_file_helper_method(self, file_path: str):
         try:
             if len(file_path) == 0:
                 QMessageBox.critical(self,"No file path provided","Please provide a file path first.")
             elif not os.path.isfile(file_path) or not os.path.exists(file_path):
                 QMessageBox.critical(self,"Not a valid path",f"The entered file path '{file_path}' is not valid or does not exist.")
             else:
+                if "/" in file_path:
+                    file_path = file_path.replace("/","\\")
                 os.startfile(file_path)
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
@@ -549,16 +556,24 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"An error occurred while generating the regex: {str(ex)}")
     
     def extract_dates_from_log(self, log_content):
-        date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
-        dates = set(re.findall(date_pattern, log_content))
-        date_format = "%d.%m.%y"
-        dates_datetime = [datetime.strptime(date, date_format) for date in dates]
-        # Sort the datetime objects
-        dates_datetime_sorted = sorted(dates_datetime)
-        # Convert datetime objects back to strings
-        dates_sorted = [datetime.strftime(date, date_format) for date in dates_datetime_sorted]
+        try:
+            date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
+            dates = set(re.findall(date_pattern, log_content))
+            try:
+                date_format = "%d.%m.%y"
+                dates_datetime = [datetime.strptime(date, date_format) for date in dates]
+            except ValueError:
+                date_pattern = r"(\d{2}\-\d{2}\-\d{2})"
+                date_format = "%d-%m-%y"
+                dates_datetime = [datetime.strptime(date, date_format) for date in dates]
+            # Sort the datetime objects
+            dates_datetime_sorted = sorted(dates_datetime)
+            # Convert datetime objects back to strings
+            dates_sorted = [datetime.strftime(date, date_format) for date in dates_datetime_sorted]
 
-        return dates_sorted
+            return dates_sorted
+        except Exception as ex:
+            QMessageBox.critical(self, "An error occurred", f"An exception of type {type(ex).__name__} occurred while trying to get the log file dates. {str(ex)}")
     
     def extract_lines_by_date_and_display(self, log_content, selected_date):
         filtered_lines = [
@@ -635,21 +650,20 @@ class MainWindow(QMainWindow):
             file_path = self.file_path_input.text()
             destination = self.destination_input.text()
             
-            
             if not destination:
                 self.statusbar.setStyleSheet("color: red")
                 self.statusbar.showMessage("Please provide a destination directory.", 10000)
                 return
             
             if not file_path:
-                reply = QMessageBox.warning(self, "No file path provided", "No file path has been provided. Do you want to continue?\nThe displayed file content will be used.", QMessageBox.Yes | QMessageBox.No)
+                reply = QMessageBox.warning(self, "No file path provided", "No file path has been provided.\nThe displayed file content will be used.\n\nDo you want to continue?", QMessageBox.Yes | QMessageBox.No)
                 if reply == QMessageBox.No:
                     return
                 else:
                     text_containing_file_paths = self.file_content_display.toPlainText()
                     if not text_containing_file_paths:
                         self.statusbar.setStyleSheet("color: red")
-                        self.statusbar.showMessage("No file content to use for moving files.", 10000)
+                        self.statusbar.showMessage("No file content found to read for moving of files.", 10000)
                         return
                     else:
                         self.statusbar.setStyleSheet("color: #2cde85")
