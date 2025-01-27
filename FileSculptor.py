@@ -556,6 +556,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"An error occurred while generating the regex: {str(ex)}")
     
     def extract_dates_from_log(self, log_content):
+        # TODO Make it dynamic by reading the first 8-10 characters only of a log file and based on that create the dates for the combobox
         try:
             date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
             dates = set(re.findall(date_pattern, log_content))
@@ -563,7 +564,9 @@ class MainWindow(QMainWindow):
                 date_format = "%d.%m.%y"
                 dates_datetime = [datetime.strptime(date, date_format) for date in dates]
             except ValueError:
+                dates.clear()
                 date_pattern = r"(\d{2}\-\d{2}\-\d{2})"
+                dates = set(re.findall(date_pattern, log_content))
                 date_format = "%d-%m-%y"
                 dates_datetime = [datetime.strptime(date, date_format) for date in dates]
             # Sort the datetime objects
@@ -605,28 +608,31 @@ class MainWindow(QMainWindow):
         try:
             file_dialog = QFileDialog(self)
             file_path, _ = file_dialog.getOpenFileNames(self, "Open File", "", "Log File (*.log);;Text File (*.txt)")
-            file_path = file_path[0]
-            file_extension = Path(file_path).suffix
-            if file_path and file_extension == ".log":
-                self.file_content_display.clear()
-                self.file_path_input.setText(file_path)
-                with open(file_path, "r") as file:
-                    file_data = file.read()
-                    self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
-                    last_item_index = self.log_dates_combobox.count() - 1
-                    self.log_dates_combobox.setCurrentIndex(last_item_index) # Load the last item in the list
-                self.statusbar.setStyleSheet("color: #2cde85")
-                self.statusbar.showMessage("Loaded log file successfully.", 8000)
-            elif file_path and file_extension == ".txt":
-                if self.log_dates_combobox.count() > 0:
-                    self.log_dates_combobox.clear()
-                self.file_content_display.clear()
-                self.file_path_input.setText(file_path)
-                with open(file_path, "r") as file:
-                    file_data = file.read()
-                    self.file_content_display.setPlainText(file_data)
-                self.statusbar.setStyleSheet("color: #2cde85")
-                self.statusbar.showMessage("Loaded text file successfully.", 8000)
+            if not file_path:
+                return
+            else:
+                file_path = file_path[0]
+                file_extension = Path(file_path).suffix
+                if file_path and file_extension == ".log":
+                    self.file_content_display.clear()
+                    self.file_path_input.setText(file_path)
+                    with open(file_path, "r") as file:
+                        file_data = file.read()
+                        self.log_dates_combobox.addItems(self.extract_dates_from_log(file_data))
+                        last_item_index = self.log_dates_combobox.count() - 1
+                        self.log_dates_combobox.setCurrentIndex(last_item_index) # Load the last item in the list
+                    self.statusbar.setStyleSheet("color: #2cde85")
+                    self.statusbar.showMessage("Loaded log file successfully.", 8000)
+                elif file_path and file_extension == ".txt":
+                    if self.log_dates_combobox.count() > 0:
+                        self.log_dates_combobox.clear()
+                    self.file_content_display.clear()
+                    self.file_path_input.setText(file_path)
+                    with open(file_path, "r") as file:
+                        file_data = file.read()
+                        self.file_content_display.setPlainText(file_data)
+                    self.statusbar.setStyleSheet("color: #2cde85")
+                    self.statusbar.showMessage("Loaded text file successfully.", 8000)
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(ex)}")
 
