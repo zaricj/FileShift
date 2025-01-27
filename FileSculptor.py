@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
         current_working_dir = os.getcwd()
         theme_file_path = os.path.join(current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        self.version = "1.1.0" # Current version of the application
+        self.version = "1.1.1" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
         icon = QIcon("_internal\\icon\\app.ico")
@@ -214,10 +214,16 @@ class MainWindow(QMainWindow):
 
         replace_layout = QVBoxLayout()
         replace_layout.addWidget(QLabel("Replace text with:"))
+        self.change_path_separator_button = QPushButton("Change Path Separator")
+        self.change_path_separator_button.setVisible(False)
+        self.change_path_separator_button.clicked.connect(self.change_path_separator)
         self.replace_string_input = QLineEdit()
         self.replace_string_input.setPlaceholderText("Replace text in file content with (e.g., D:/Lobster_data/lib/)")
         self.replace_string_input.setToolTip("Enter the text to replace the found text within the displayed file content.\nExample: D:/Lobster_data/lib/")
+        self.replace_string_input.setClearButtonEnabled(True)
+        self.replace_string_input.textChanged.connect(self.enable_change_path_separator_button)
         replace_layout.addWidget(self.replace_string_input)
+        replace_layout.addWidget(self.change_path_separator_button)
 
         remove_layout = QVBoxLayout()
         remove_layout.addWidget(QLabel("Remove phrases:"))
@@ -387,6 +393,24 @@ class MainWindow(QMainWindow):
         # redo_action = QAction("Redo", self)
         # redo_action.triggered.connect(self.file_content_display.redo)
         # edit_menu.addAction(redo_action)
+    
+    def change_path_separator(self):
+        try:
+            input_replace_text = self.replace_string_input.text()
+
+            if "/" in input_replace_text:
+                new_input_replace_text = input_replace_text.replace("/","\\")
+            else:
+                new_input_replace_text = input_replace_text.replace("\\","/")
+
+            self.replace_string_input.setText(new_input_replace_text)
+        except Exception as ex:
+            QMessageBox.critical(self, "Changing path separator error", f"An error occurred while trying to change path separator: {str(ex)}")
+    
+    def enable_change_path_separator_button(self):
+        self.change_path_separator_button.setVisible(True)
+        if len(self.replace_string_input.text()) == 0:
+            self.change_path_separator_button.setVisible(False)
     
     def search_and_replace_file_content(self):
         try:
