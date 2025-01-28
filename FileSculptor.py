@@ -556,27 +556,64 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"An error occurred while generating the regex: {str(ex)}")
     
     def extract_dates_from_log(self, log_content):
-        # TODO Make it dynamic by reading the first 8-10 characters only of a log file and based on that create the dates for the combobox
         try:
-            date_pattern = r"(\d{2}\.\d{2}\.\d{2})"
-            dates = set(re.findall(date_pattern, log_content))
-            try:
-                date_format = "%d.%m.%y"
-                dates_datetime = [datetime.strptime(date, date_format) for date in dates]
-            except ValueError:
-                dates.clear()
-                date_pattern = r"(\d{2}\-\d{2}\-\d{2})"
-                dates = set(re.findall(date_pattern, log_content))
-                date_format = "%d-%m-%y"
-                dates_datetime = [datetime.strptime(date, date_format) for date in dates]
+            # Split the log content into lines
+            lines = log_content.splitlines()
+
+            # Define possible date patterns with strict and specific matching
+            date_patterns = [
+                (r"^(\d{2}\.\d{2}\.\d{4})", "%d.%m.%Y"),  # DD.MM.YYYY
+                (r"^(\d{2}-\d{2}-\d{4})", "%d-%m-%Y"),    # DD-MM-YYYY
+                (r"^(\d{2}\.\d{2}\.\d{2})", "%d.%m.%y"),  # DD.MM.YY
+                (r"^(\d{2}-\d{2}-\d{2})", "%d-%m-%y")     # DD-MM-YY
+            ]
+
+            dates = set()  # Use a set to store unique dates
+
+            # Process each line
+            for line in lines:
+                # Extract the first 10 characters of the line
+                first_10_chars = line[:10]
+
+                # Try to match each pattern
+                for pattern, date_format in date_patterns:
+                    match = re.match(pattern, first_10_chars)
+                    if match:
+                        date_str = match.group(1)
+                        try:
+                            # Validate the date by parsing it
+                            datetime.strptime(date_str, date_format)
+                            dates.add((date_str, date_format))  # Store date and its format
+                            break  # Stop checking other patterns once a match is found
+                        except ValueError:
+                            # If the date is invalid (e.g., 30.02.2023), skip it
+                            continue
+
+            if not dates:
+                raise ValueError("No valid date patterns found in the log file.")
+
+            # Convert matched dates to datetime objects
+            dates_datetime = []
+            for date_str, date_format in dates:
+                dates_datetime.append(datetime.strptime(date_str, date_format))
+
             # Sort the datetime objects
             dates_datetime_sorted = sorted(dates_datetime)
-            # Convert datetime objects back to strings
-            dates_sorted = [datetime.strftime(date, date_format) for date in dates_datetime_sorted]
+
+            # Convert datetime objects back to strings using their original format
+            dates_sorted = []
+            for date in dates_datetime_sorted:
+                # Find the original format for this date
+                for date_str, date_format in dates:
+                    if datetime.strptime(date_str, date_format) == date:
+                        dates_sorted.append(date.strftime(date_format))
+                        break
 
             return dates_sorted
+
         except Exception as ex:
             QMessageBox.critical(self, "An error occurred", f"An exception of type {type(ex).__name__} occurred while trying to get the log file dates. {str(ex)}")
+            return []
     
     def extract_lines_by_date_and_display(self, log_content, selected_date):
         filtered_lines = [
@@ -611,6 +648,9 @@ class MainWindow(QMainWindow):
             if not file_path:
                 return
             else:
+                # Clear log dates combobox
+                if self.log_dates_combobox.count() > 0:
+                    self.log_dates_combobox.clear()
                 file_path = file_path[0]
                 file_extension = Path(file_path).suffix
                 if file_path and file_extension == ".log":
