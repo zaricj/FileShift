@@ -117,7 +117,7 @@ class MainWindow(QMainWindow):
         self.initialize_theme(dark_theme_file)
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle(f"FileSculptor v{self.version} © - by Jovan")
+        self.setWindowTitle(f"PathShift v{self.version} © - by Jovan")
         self.create_menu_bar()
 
     def initUI(self):
