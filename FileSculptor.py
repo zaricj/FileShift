@@ -5,6 +5,7 @@ import re
 import requests
 import py7zr
 import subprocess
+import webbrowser
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy, QGridLayout, QSplitter, QTabWidget, QProgressBar
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
@@ -844,7 +845,9 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.information(self, "No Updates", "You are using the latest version.")
         except requests.RequestException as e:
-            QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}")
+            reply = QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}\n\nDo you want to open the URL manually?", QMessageBox.Yes, QMessageBox.Close)
+            if reply == QMessageBox.Yes:
+                webbrowser.open(f"https://github.com/{repo_owner}/{repo_name}/releases/tag/{self.version}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while extracting the update:\n{str(e)}")
             
