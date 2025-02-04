@@ -7,7 +7,7 @@ import py7zr
 import subprocess
 import webbrowser
 from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QMenu, QMenuBar, QWidget, QStatusBar, QSizePolicy, QGridLayout, QSplitter, QTabWidget, QProgressBar
+from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QWidget, QStatusBar, QSizePolicy, QProgressBar
 from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
 from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
 from datetime import datetime
@@ -107,10 +107,10 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # Initializing current working director and theme file(s)
-        current_working_dir = os.getcwd()
-        theme_file_path = os.path.join(current_working_dir,"_internal","theme_files")
+        self.current_working_dir = os.getcwd()
+        theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        self.version = "1.1.1" # Current version of the application
+        self.version = "1.1.2" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
         icon = QIcon("_internal\\icon\\app.ico")
@@ -143,8 +143,8 @@ class MainWindow(QMainWindow):
         # Input file selection with icon
         file_input_layout = QHBoxLayout()
         self.file_path_input = QLineEdit()
-        self.file_path_input.setPlaceholderText("Browse for the file to read it's contents...")
-        self.file_path_input.setReadOnly(True)
+        self.file_path_input.setPlaceholderText("Select a text or log file to read and display it's content...")
+        self.file_path_input.setReadOnly(False)
         self.browse_button = QPushButton("Browse File")
         self.browse_button.clicked.connect(self.browse_file)
         file_input_layout.addWidget(self.file_path_input)
@@ -153,8 +153,8 @@ class MainWindow(QMainWindow):
         # Destination selection with icon
         dest_input_layout = QHBoxLayout()
         self.destination_input = QLineEdit()
-        self.destination_input.setPlaceholderText("Browse the destination directory where the files should be moved to...")
-        self.destination_input.setReadOnly(True)
+        self.destination_input.setPlaceholderText("Select destination directory where the files should be moved to...")
+        self.destination_input.setReadOnly(False)
         self.set_folder_button = QPushButton("Set Folder")
         self.set_folder_button.clicked.connect(self.browse_folder)
         dest_input_layout.addWidget(self.destination_input)
@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
         # Action buttons
         action_layout = QHBoxLayout()
         self.move_button = QPushButton("Move Files")
-        self.move_button.setToolTip("Move the files to the destination directory.")
+        self.move_button.setToolTip("If the file content view contains full file paths in each new line\nthen it moves those listed files to the set destination directory.")
         self.move_button.clicked.connect(self.move_files)
         
         action_layout.addWidget(self.move_button)
@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
         pattern_header = QHBoxLayout()
         pattern_header.addWidget(QLabel("Search Pattern:"))
         self.regex_pattern_input = QLineEdit()
-        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern to search the displayed file content...")
+        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern which is used to search the displayed file content...")
         self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the displayed file content.")
         self.regex_pattern_input.setClearButtonEnabled(True)
         
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
 
         replace_layout = QVBoxLayout()
         replace_layout.addWidget(QLabel("Replace text with:"))
-        self.change_path_separator_button = QPushButton("Change Path Separator")
+        self.change_path_separator_button = QPushButton("Switch Path Separator")
         self.change_path_separator_button.setVisible(False)
         self.change_path_separator_button.clicked.connect(self.change_path_separator)
         self.replace_string_input = QLineEdit()
@@ -522,7 +522,7 @@ class MainWindow(QMainWindow):
     def open_folder_helper_method(self, folder_path):
         try:
             if len(folder_path) == 0:
-                QMessageBox.critical(self,"No file path provided","Please provide a file path first.")
+                QMessageBox.critical(self,"No file path provided","Please provide a folder path first.")
             elif not os.path.isdir(folder_path) or not os.path.exists(folder_path):
                 QMessageBox.critical(self,"Not a valid path",f"The entered folder path '{folder_path}' is not valid or does not exist.")
             else:
@@ -689,79 +689,72 @@ class MainWindow(QMainWindow):
             self.destination_input.setText(folder_path)
 
     def move_files(self):
-        reply = QMessageBox.information(self, "Move files", "Are you sure you want to move the files?", QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.No:
+        destination = self.destination_input.text()
+        text_containing_file_paths = self.file_content_display.toPlainText()
+        
+        # Check if destination directory has been set before trying to move any files, if not leave function and display error
+        if not destination:
+            self.statusbar.setStyleSheet("color: red")
+            self.statusbar.showMessage("Please provide a destination directory.", 10000)
+            self.program_output.setText("ERROR: Destination directory has not been set.")
             return
         else:
-            self.program_output.clear()
-            file_path = self.file_path_input.text()
-            destination = self.destination_input.text()
-            
-            if not destination:
+            if not text_containing_file_paths:
                 self.statusbar.setStyleSheet("color: red")
-                self.statusbar.showMessage("Please provide a destination directory.", 10000)
+                self.statusbar.showMessage("File content display is empty, hence nothing to move.")
                 return
-            
-            if not file_path:
-                reply = QMessageBox.warning(self, "No file path provided", "No file path has been provided.\nThe displayed file content will be used.\n\nDo you want to continue?", QMessageBox.Yes | QMessageBox.No)
-                if reply == QMessageBox.No:
-                    return
-                else:
-                    text_containing_file_paths = self.file_content_display.toPlainText()
-                    if not text_containing_file_paths:
-                        self.statusbar.setStyleSheet("color: red")
-                        self.statusbar.showMessage("No file content found to read for moving of files.", 10000)
-                        return
-                    else:
-                        self.statusbar.setStyleSheet("color: #2cde85")
-                        self.statusbar.showMessage("Using the displayed file content.", 10000)
+            else:
+                self.statusbar.setStyleSheet("color: #2cde85")
+                self.statusbar.showMessage("Using the displayed file content.", 10000)
+                self.program_output.clear()
+                    
+                check_path_string_delimiter = ["/", "\\"]
+                task_completed_message = "Task finished, results:"
+                #self.statusbar.setStyleSheet("color: #2cde85")
+                line_count = 1
+                err_count = 0
+                warn_count = 0
 
-            check_path_string_delimiter = ["/", "\\"]
-            task_completed_message = "Moving task completed successfully."
-            self.statusbar.setStyleSheet("color: #2cde85")
-            line_count = 1
-            err_count = 0
-            warn_count = 0
+                try:
+                    # Cleaned paths without high commas in the file content display
+                    lines = self.clean_paths_in_line(text_containing_file_paths)
+                    total_lines = len(lines)
+                    for line in lines:
+                        #progress = round((line_count / total_lines) * 100)
+                        file_to_move = line.strip()
+                        if file_to_move:
+                            # Get the file name with its immediate parent directory
+                            if check_path_string_delimiter[0] in file_to_move:  # Forward slash
+                                sub_dir = "/".join(file_to_move.split("/")[-2:])  # Gets "lib/filename.jar"
+                            elif check_path_string_delimiter[1] in file_to_move:  # Backslash
+                                sub_dir = "\\".join(file_to_move.split("\\")[-2:])  # Gets "lib\filename.jar"
+                            # Create the full destination path
+                            current_destination = os.path.join(destination, sub_dir)
 
-            try:
-                # Cleaned paths without high commas in the file content display
-                lines = self.clean_paths_in_line(text_containing_file_paths)
-                total_lines = len(lines)
-                for line in lines:
-                    file_to_move = line.strip()
-                    if file_to_move:
-                        # Get the file name with its immediate parent directory
-                        if check_path_string_delimiter[0] in file_to_move:  # Forward slash
-                            sub_dir = "/".join(file_to_move.split("/")[-2:])  # Gets "lib/filename.jar"
-                        elif check_path_string_delimiter[1] in file_to_move:  # Backslash
-                            sub_dir = "\\".join(file_to_move.split("\\")[-2:])  # Gets "lib\filename.jar"
-                        # Create the full destination path
-                        current_destination = os.path.join(destination, sub_dir)
-                        
-                        try:
-                            # Ensure the destination directory exists
-                            if os.path.exists(file_to_move):
-                                os.makedirs(os.path.dirname(current_destination), exist_ok=True)
-                            shutil.move(file_to_move, current_destination)
-                            self.program_output.append(f"Moved <span style='color: #197cff'>{file_to_move}</span> to <span style='color: green'>{current_destination}</span>")
-                            self.statusbar.showMessage(f"Moved {line_count}/{total_lines} files.", 10000)
-                        except FileNotFoundError:
-                            self.program_output.append(f"<span style='color: orange'>WARN: {file_to_move}</span> not found, skipping.")
-                            warn_count += 1
-                            continue
-                        except shutil.Error as e:
-                            self.program_output.append(f"<span style='color: red'>ERROR: {e}</span>")
-                            err_count += 1
-                            continue
-                        line_count += 1
-                self.program_output.append(f"\n=======================\n{task_completed_message}\n=======================\n")
-                if err_count > 0:
-                    self.program_output.append(f"<span style='color: red'>ERROR: {err_count} files failed to move.</span>")
-                if warn_count > 0:
-                    self.program_output.append(f"<span style='color: orange'>WARNING: {warn_count} files were not found.</span>")
-            except Exception as e:
-                self.program_output.append(f"<span style='color: red'>ERROR: {e}</span>")
-            
+                            try:
+                                # Ensure the destination directory exists
+                                if os.path.exists(file_to_move):
+                                    os.makedirs(os.path.dirname(current_destination), exist_ok=True)
+                                shutil.move(file_to_move, current_destination)
+                                self.program_output.append(f"Moved <span style='color:rgb(39, 124, 236)'>{file_to_move}</span> to <span style='color: green'>{current_destination}</span>")
+                                self.statusbar.showMessage(f"Moved {line_count}/{total_lines} files.", 10000)
+                            except FileNotFoundError:
+                                self.program_output.append(f"<span style='color: orange'>WARN: {file_to_move}</span> not found, skipping.")
+                                warn_count += 1
+                                continue
+                            except shutil.Error as e:
+                                self.program_output.append(f"<span style='color: red'>ERROR: {e}</span>")
+                                err_count += 1
+                                continue
+                            line_count += 1
+                    self.program_output.append(f"\n{task_completed_message}\n")
+                    if err_count > 0:
+                        self.program_output.append(f"<span style='color: red'><strong>ERROR:</strong></span> {err_count} files failed to move.")
+                    if warn_count > 0:
+                        self.program_output.append(f"<span style='color: orange'><strong>WARNING:</strong></span> {warn_count} files were not found.")
+                except Exception as e:
+                    self.program_output.append(f"<span style='color: red'>FATAL ERROR: {e}</span>")
+
     def initialize_theme(self, theme_file):
         try:
             file = QFile(theme_file)
@@ -780,6 +773,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).closeEvent(event)
         
     def check_for_updates(self):
+        install_path = self.current_working_dir
         repo_owner = "zaricj"
         repo_name = "FileSculptor"
         api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
@@ -824,28 +818,33 @@ class MainWindow(QMainWindow):
                                 self.progressbar.setValue(progress)
 
                     # Unzip the downloaded file
+                    extract_path = f"{repo_name}_{latest_version}"
                     with py7zr.SevenZipFile(zip_path, mode='r') as archive:
-                        archive.extractall(path=f"{repo_name}_{latest_version}")
+                        archive.extractall(path=extract_path)
+                    
+                    # Replace old files with  new ones
+                    if os.path.exists(install_path):
+                        shutil.rmtree(install_path)
+                    shutil.move(extract_path, install_path)
 
                     # Check if the update was successful
-                    if os.path.exists(f"{repo_name}_{latest_version}"):
+                    if os.path.exists(extract_path):
                         updated_reply = QMessageBox.information(
                             self,
                             "Update Successful",
                             f"The update has been downloaded and unzipped successfully.\nLocation: {os.path.abspath(f'{repo_name}_{latest_version}')}\n\nDo you want to restart the application?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                        # Delete downloaded 7z file
+                        os.remove(zip_path)
                         if updated_reply == QMessageBox.Yes:
-                            # Clean up the zip file
-                            os.remove(zip_path)
+                            # Restart application
                             self.restart_application()
-                        else:
-                            os.remove(zip_path)
                         self.progressbar.setVisible(False)
                     else:
-                        QMessageBox.critical(self, "Update Failed", "The update could not be unzipped.")
+                        QMessageBox.critical(self, "Update Failed", "The update file could not be unzipped.")
             else:
                 QMessageBox.information(self, "No Updates", "You are using the latest version.")
         except requests.RequestException as e:
-            reply = QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}\n\nDo you want to open the URL manually?", QMessageBox.Yes, QMessageBox.Close)
+            reply = QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}\n\nDo you want to open the repo URL manually?", QMessageBox.Yes, QMessageBox.Close)
             if reply == QMessageBox.Yes:
                 webbrowser.open(f"https://github.com/{repo_owner}/{repo_name}/releases/tag/{self.version}")
         except Exception as e:
