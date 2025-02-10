@@ -108,6 +108,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         # Initializing current working director and theme file(s)
         self.current_working_dir = os.getcwd()
+        self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
         self.version = "1.1.2" # Current version of the application
@@ -145,10 +146,17 @@ class MainWindow(QMainWindow):
         self.file_path_input = QLineEdit()
         self.file_path_input.setPlaceholderText("Select a text or log file to read and display it's content...")
         self.file_path_input.setReadOnly(False)
+        self.file_path_input.textChanged.connect(lambda: self.refresh_icon_button.setVisible(True) if os.path.isfile(self.file_path_input.text()) else self.refresh_icon_button.setVisible(False))
         self.browse_button = QPushButton("Browse File")
         self.browse_button.clicked.connect(self.browse_file)
+        self.refresh_icon_button = QPushButton()
+        self.refresh_icon_button.setIcon(self.refresh_icon)
+        self.refresh_icon_button.setToolTip("Refresh the file content view.")
+        self.refresh_icon_button.setVisible(False)
+        self.refresh_icon_button.clicked.connect(self.refresh_file_content)
         file_input_layout.addWidget(self.file_path_input)
         file_input_layout.addWidget(self.browse_button)
+        file_input_layout.addWidget(self.refresh_icon_button)
 
         # Destination selection with icon
         dest_input_layout = QHBoxLayout()
@@ -297,6 +305,7 @@ class MainWindow(QMainWindow):
         self.file_content_display = QTextEdit()
         self.file_content_display.setReadOnly(False)
         self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
+        self.file_content_display.undoAvailable
         
         # Progressbar
         self.progressbar = QProgressBar()
@@ -497,7 +506,6 @@ class MainWindow(QMainWindow):
         return line
 
     def change_word_wrap(self):
-        
         if self.change_word_wrap_action.isChecked():
             self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
             self.program_output.setWordWrapMode(QTextOption.ManualWrap)
@@ -542,7 +550,6 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while cleaning high commas ' in the paths: {str(ex)}")
         
-    
     def generate_regex(self):
         try:
             input_text = self.regex_pattern_input.text()
@@ -641,6 +648,16 @@ class MainWindow(QMainWindow):
                 return file_data
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
+    
+    def refresh_file_content(self):
+        try:
+            file_path = self.file_path_input.text()
+            if os.path.isfile(file_path):
+                with open(file_path, "r") as file:
+                    file_data = file.read()
+                self.file_content_display.setPlainText(file_data)
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while refreshing the file content: {str(ex)}")
         
     def browse_file(self):
         try:
