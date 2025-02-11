@@ -1,16 +1,34 @@
-import sys
-import shutil
 import os
 import re
-import requests
-import py7zr
+import shutil
 import subprocess
+import sys
 import webbrowser
-from pathlib import Path
-from PySide6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QFileDialog, QTextEdit, QLabel, QMessageBox, QGroupBox, QComboBox, QWidget, QStatusBar, QSizePolicy, QProgressBar
-from PySide6.QtGui import QTextOption, QCloseEvent, QIcon, QAction
-from PySide6.QtCore import Qt, QSettings, QFile, QTextStream
+import py7zr
+import requests
 from datetime import datetime
+from pathlib import Path
+from PySide6.QtCore import QFile, QSettings, QTextStream
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QTextOption
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSizePolicy,
+    QStatusBar,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 # Regex Generator class to convert string to regex pattern
 class RegexGenerator:
