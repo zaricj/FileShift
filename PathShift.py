@@ -651,11 +651,17 @@ class MainWindow(QMainWindow):
     
     def refresh_file_content(self):
         try:
+            current_text = self.log_dates_combobox.currentText()
             file_path = self.file_path_input.text()
             if os.path.isfile(file_path):
                 with open(file_path, "r") as file:
                     file_data = file.read()
-                self.file_content_display.setPlainText(file_data)
+                if self.log_dates_combobox.count() > 0:
+                    lines = self.extract_lines_by_date_and_display(file_data, current_text)
+                    for line in lines:
+                        self.file_content_display.append(line)
+                else:
+                    self.file_content_display.setPlainText(file_data)
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while refreshing the file content: {str(ex)}")
         
