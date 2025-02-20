@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        self.version = "1.1.2" # Current version of the application
+        self.version = "1.1.3" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
         icon = QIcon("_internal\\icon\\app.ico")
@@ -331,8 +331,14 @@ class MainWindow(QMainWindow):
         self.progressbar.setMinimumWidth(260)
         self.progressbar.setVisible(False)
         
+        # Statusbar line count
+        self.line_count_statusbar = QStatusBar()
+        self.line_count_statusbar.setSizeGripEnabled(False)
+        self.line_count_statusbar.setStyleSheet("color: #ffffff; font-size: 14px")
+        self.file_content_display.cursorPositionChanged.connect(lambda: self.line_count_statusbar.showMessage(f"Line: {self.file_content_display.textCursor().blockNumber() + 1}", 10000))
         content_layout.addLayout(content_toolbar)
         content_layout.addWidget(self.file_content_display)
+        content_layout.addWidget(self.line_count_statusbar)
         content_group.setLayout(content_layout)
 
         # Program Output
