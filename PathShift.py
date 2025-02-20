@@ -253,9 +253,9 @@ class MainWindow(QMainWindow):
         replace_layout.addWidget(self.change_path_separator_button)
 
         remove_layout = QVBoxLayout()
-        remove_layout.addWidget(QLabel("Remove phrases:"))
+        remove_layout.addWidget(QLabel("Remove phrases (comma-separated):"))
         self.phrase_to_remove_input = QLineEdit()
-        self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove comma-separated (e.g., Marking file, to be deleted on exit of JVM)")
+        self.phrase_to_remove_input.setPlaceholderText("Enter phrases to remove (e.g., Marking file, to be deleted on exit of JVM)")
         self.phrase_to_remove_input.setToolTip("Enter phrases to remove from the displayed file content.\nCan be comma-separated (eg., Marking file, to be deleted on exit of JVM).")
         self.phrase_to_remove_input.setClearButtonEnabled(True)
         remove_layout.addWidget(self.phrase_to_remove_input)
