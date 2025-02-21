@@ -37,7 +37,7 @@ This program was developed to clean up files, especially .jar files. It fixes th
 
 ## How to Use
 
-![GUI Image](docs\image.png)
+![GUI Image](docs/image.png)
 
 ### 1. Browsing Files
 
@@ -64,7 +64,7 @@ This program was developed to clean up files, especially .jar files. It fixes th
 
 - The `Search` button searches the file content which is displayed and re-display only found matches based on the regular expression.
 
-![GIF 01](docs\gifs\01_PathShift_SearchFunction.gif)
+![GIF 01](docs/gifs/01_PathShift_SearchFunction.gif)
 
 ### 6. Text to replace
 
@@ -82,11 +82,11 @@ This program was developed to clean up files, especially .jar files. It fixes th
 
 - Press the `Apply` button to take over the changes based on the inputs.
 
-![GIF 02](docs\gifs\02_PathShift_TextManiFunction.gif)
+![GIF 02](docs/gifs/02_PathShift_TextManiFunction.gif)
 
 ### Using Autofill option GIF (Quicker than manual input)
 
-![GIF 03](docs\gifs\03_PathShift_AutoFillFunction.gif)
+![GIF 03](docs/gifs/03_PathShift_AutoFillFunction.gif)
 
 ### 10. Move files
 
