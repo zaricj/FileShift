@@ -411,22 +411,17 @@ class MainWindow(QMainWindow):
         self.change_word_wrap_action.toggled.connect(self.change_word_wrap)
         view_menu.addAction(self.change_word_wrap_action)
         
+        fill_menu = menubar.addMenu("&AutoFill")
+        lob_jar_clean_action = QAction("Lobster .jar Cleanup", self)
+        lob_jar_clean_action.triggered.connect(self.fill_lobster_jar_cleanup)
+        fill_menu.addAction(lob_jar_clean_action)
+        
         # About Menu
         about_menu = menubar.addMenu("&About")
         check_updates_action = QAction("Check for Updates", self)
         check_updates_action.triggered.connect(self.check_for_updates)
         about_menu.addAction(check_updates_action)
         
-        # Edit Menu
-        # edit_menu = menubar.addMenu("&Edit")
-        # 
-        # undo_action = QAction("Undo", self)
-        # undo_action.triggered.connect(self.file_content_display.undo)
-        # edit_menu.addAction(undo_action)
-        # 
-        # redo_action = QAction("Redo", self)
-        # redo_action.triggered.connect(self.file_content_display.redo)
-        # edit_menu.addAction(redo_action)
     
     def change_path_separator(self):
         try:
@@ -528,6 +523,20 @@ class MainWindow(QMainWindow):
             line = line.replace(original_phrase, replacement_phrase)
 
         return line
+    
+    def fill_lobster_jar_cleanup(self):
+        try:
+            # Get file content
+            print(len(self.file_content_display.toPlainText()))
+            self.regex_pattern_input.setText(r"(Marking)\s(file)")
+            self.find_string_input.setText("./lib/")
+            self.replace_string_input.setText("D:/Lobster_data/lib/")
+            self.phrase_to_remove_input.setText("Marking file, ', to be deleted on exit of JVM")
+            if len(self.file_content_display.toPlainText()) > 0:
+                self.search_and_replace_file_content()
+                self.apply_and_replace_file_content()
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while trying to fill the lobster jar cleanup: {str(ex)}")
 
     def change_word_wrap(self):
         if self.change_word_wrap_action.isChecked():
@@ -743,7 +752,7 @@ class MainWindow(QMainWindow):
         if not destination:
             self.statusbar.setStyleSheet("color: red")
             self.statusbar.showMessage("Please provide a destination directory.", 10000)
-            self.program_output.setText("ERROR: Destination directory has not been set.")
+            self.program_output.setText("<span style='color: red'>ERROR: Destination directory has not been set.</span>")
             return
         else:
             if not text_containing_file_paths:
