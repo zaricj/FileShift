@@ -129,7 +129,7 @@ class MainWindow(QMainWindow):
         self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        self.version = "1.1.3" # Current version of the application
+        self.version = "1.1.4" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
         icon = QIcon("_internal\\icon\\app.ico")
@@ -137,7 +137,7 @@ class MainWindow(QMainWindow):
         self.initialize_theme(dark_theme_file)
         self.setWindowIcon(icon)
         self.initUI()
-        self.setWindowTitle(f"PathShift v{self.version} © - by Jovan")
+        self.setWindowTitle(f"FileShift v{self.version} © - by Jovan")
         self.create_menu_bar()
 
     def initUI(self):
@@ -148,6 +148,11 @@ class MainWindow(QMainWindow):
         self.statusbar = QStatusBar()
         self.statusbar.setSizeGripEnabled(False)
         self.statusbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        
+        # Statusbar line count
+        self.line_count_statusbar = QStatusBar()
+        self.line_count_statusbar.setSizeGripEnabled(False)
+        self.line_count_statusbar.setStyleSheet("color: #ffffff; font-size: 14px")
 
         # Left Panel - Controls
         left_panel = QWidget()
@@ -315,10 +320,8 @@ class MainWindow(QMainWindow):
         content_toolbar.addSpacing(20)
         content_toolbar.addWidget(QLabel("Font Size:"))
         content_toolbar.addWidget(self.font_size_combobox_file_contents)
-        content_toolbar.addSpacing(20)
-        content_toolbar.addWidget(QLabel("Status:"))
-        content_toolbar.addWidget(self.statusbar)
-        #content_toolbar.addStretch()
+        content_toolbar.addWidget(self.line_count_statusbar)
+        
 
         self.file_content_display = QTextEdit()
         self.file_content_display.setReadOnly(False)
@@ -331,14 +334,10 @@ class MainWindow(QMainWindow):
         self.progressbar.setMinimumWidth(260)
         self.progressbar.setVisible(False)
         
-        # Statusbar line count
-        self.line_count_statusbar = QStatusBar()
-        self.line_count_statusbar.setSizeGripEnabled(False)
-        self.line_count_statusbar.setStyleSheet("color: #ffffff; font-size: 14px")
         self.file_content_display.cursorPositionChanged.connect(lambda: self.line_count_statusbar.showMessage(f"Line: {self.file_content_display.textCursor().blockNumber() + 1}", 10000))
         content_layout.addLayout(content_toolbar)
         content_layout.addWidget(self.file_content_display)
-        content_layout.addWidget(self.line_count_statusbar)
+        content_layout.addWidget(self.progressbar)
         content_group.setLayout(content_layout)
 
         # Program Output
@@ -349,11 +348,8 @@ class MainWindow(QMainWindow):
         output_toolbar.addWidget(QLabel("Font Size:"))
         output_toolbar.addWidget(self.font_size_combobox_output)
         output_toolbar.addSpacing(10)
-        output_toolbar.addWidget(QPushButton("Clear Output", clicked=lambda: self.program_output.clear()))
-        output_toolbar.addSpacing(10)
-        output_toolbar.addWidget(self.progressbar)
-        output_toolbar.addStretch()
-
+        output_toolbar.addWidget(QLabel("Status:"))
+        output_toolbar.addWidget(self.statusbar)
         self.program_output = QTextEdit()
         self.program_output.setReadOnly(True)
         self.program_output.setWordWrapMode(QTextOption.ManualWrap)
@@ -527,7 +523,6 @@ class MainWindow(QMainWindow):
     def fill_lobster_jar_cleanup(self):
         try:
             # Get file content
-            print(len(self.file_content_display.toPlainText()))
             self.regex_pattern_input.setText(r"(Marking)\s(file)")
             self.find_string_input.setText("./lib/")
             self.replace_string_input.setText("D:/Lobster_data/lib/")
