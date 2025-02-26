@@ -3,7 +3,7 @@ import re
 import shutil
 import subprocess
 import sys
-import webbrowser
+import subprocess
 import py7zr
 import requests
 from datetime import datetime
@@ -823,40 +823,41 @@ class MainWindow(QMainWindow):
         self.settings.setValue("geometry", geometry)
         super(MainWindow, self).closeEvent(event)
         
+
     def check_for_updates(self):
         install_path = self.current_working_dir
+        temp_path = os.path.join(os.path.dirname(install_path), "update_temp")
         repo_owner = "zaricj"
-        repo_name = "FileSculptor"
-        api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
-        #token = "none"
-        
-        #headers = {"Authorization": f"token {token}"}
+        repo_name = "FileShift"
+        api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"  
 
         try:
-            response = requests.get(api_url) # Re-add headers=headers and add secret token
+            response = requests.get(api_url)
             response.raise_for_status()
             latest_release = response.json()
-            latest_version = latest_release["tag_name"]
+            latest_version = latest_release["tag_name"] 
 
-            # Extract the browser_download_url
-            if "assets" in latest_release and len(latest_release["assets"]) > 0:
+            if "assets" in latest_release and latest_release["assets"]:
                 download_url = latest_release["assets"][0]["browser_download_url"]
             else:
                 QMessageBox.critical(self, "Error", "No downloadable assets found in the latest release.")
-                return
+                return  
 
             if self.version < latest_version:
                 reply = QMessageBox.question(
                     self,
                     "Update Available",
-                    f"A new version ({latest_version}) is available.\nDo you want to download the update?",
+                    f"A new version ({latest_version}) is available.\nDo you want to download the update?\n\nProgram will restart after the update.",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
                 if reply == QMessageBox.Yes:
                     self.progressbar.setVisible(True)
                     self.program_output.append("Downloading update...")
-                    zip_path = f"{repo_name}.7z"
+                    zip_path = os.path.join(temp_path, f"{repo_name}.7z")   
+
+                    os.makedirs(temp_path, exist_ok=True)   
+
                     with requests.get(download_url, stream=True, verify=False) as r:
                         r.raise_for_status()
                         total_size = int(r.headers.get('content-length', 0))
@@ -866,45 +867,72 @@ class MainWindow(QMainWindow):
                                 downloaded += len(chunk)
                                 file.write(chunk)
                                 progress = round((downloaded / total_size) * 100)
-                                self.progressbar.setValue(progress)
+                                self.progressbar.setValue(progress) 
 
-                    # Unzip the downloaded file
-                    extract_path = f"{repo_name}_{latest_version}"
+                    # Unzip the update
                     with py7zr.SevenZipFile(zip_path, mode='r') as archive:
-                        archive.extractall(path=extract_path)
-                    
-                    # Replace old files with  new ones
-                    if os.path.exists(install_path):
-                        shutil.rmtree(install_path)
-                    shutil.move(extract_path, install_path)
+                        archive.extractall(path=temp_path)  
 
-                    # Check if the update was successful
-                    if os.path.exists(extract_path):
-                        updated_reply = QMessageBox.information(
-                            self,
-                            "Update Successful",
-                            f"The update has been downloaded and unzipped successfully.\nLocation: {os.path.abspath(f'{repo_name}_{latest_version}')}\n\nDo you want to restart the application?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                        # Delete downloaded 7z file
-                        os.remove(zip_path)
-                        if updated_reply == QMessageBox.Yes:
-                            # Restart application
-                            self.restart_application()
-                        self.progressbar.setVisible(False)
-                    else:
-                        QMessageBox.critical(self, "Update Failed", "The update file could not be unzipped.")
+                    # Delete the zip file
+                    os.remove(zip_path) 
+
+                    # Launch the updater script
+                    updater_script = os.path.join(temp_path, "updater.py")
+                    with open(updater_script, "w") as f:
+                        f.write(self.create_updater_script(install_path, temp_path))    
+
+                    subprocess.Popen(["python", updater_script], close_fds=True)
+                    sys.exit()  # Exit the main app so it can be replaced
             else:
                 QMessageBox.information(self, "No Updates", "You are using the latest version.")
         except requests.RequestException as e:
-            reply = QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}\n\nDo you want to open the repo URL manually?", QMessageBox.Yes, QMessageBox.Close)
-            if reply == QMessageBox.Yes:
-                webbrowser.open(f"https://github.com/{repo_owner}/{repo_name}/releases/tag/{self.version}")
+            QMessageBox.critical(self, "Error", f"An error occurred while checking for updates:\n{str(e)}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while extracting the update:\n{str(e)}")
+        
             
-    def restart_application(self):
-        """Restart the application."""
-        QApplication.quit()
-        subprocess.Popen([sys.executable] + sys.argv)
+    def create_updater_script(self, install_path, temp_path):
+        return f"""
+import os
+import shutil
+import time
+import sys
+
+install_path = r"{install_path}"
+temp_path = r"{temp_path}"
+exe_name = "FileShift.exe"
+
+def wait_for_process(exe_name):
+    time.sleep(3)  # Small delay before checking
+    while any(exe_name.lower() in p.lower() for p in os.popen('tasklist').read().splitlines()):
+        time.sleep(1)
+
+wait_for_process(exe_name)
+
+# Ensure the install directory exists
+if not os.path.exists(install_path):
+    os.makedirs(install_path)
+
+# Move all files from temp_path to install_path
+for item in os.listdir(temp_path):
+    src = os.path.join(temp_path, item)
+    dest = os.path.join(install_path, item)
+
+    if os.path.isdir(src):
+        shutil.copytree(src, dest, dirs_exist_ok=True)  # Copies directories
+    else:
+        shutil.copy2(src, dest)  # Copies individual files
+
+# Cleanup temp directory
+shutil.rmtree(temp_path, ignore_errors=True)
+
+# Restart application
+exe_path = os.path.join(install_path, exe_name)
+os.startfile(exe_path)
+
+# Remove this script
+os.remove(os.path.join(install_path, "updater.py"))
+"""
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
