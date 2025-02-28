@@ -636,11 +636,11 @@ class MainWindow(QMainWindow):
         
         fill_menu = menubar.addMenu("&AutoFill")
         lob_jar_clean_action = QAction("Lobster .jar Cleanup", self)
+        fill_menu.addAction(lob_jar_clean_action)
         fill_menu.addSeparator()
         add_custom_clean_action = QAction("+ Add Custom Clean Action", self)
         add_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
         lob_jar_clean_action.triggered.connect(self.fill_lobster_jar_cleanup)
-        fill_menu.addAction(lob_jar_clean_action)
         fill_menu.addAction(add_custom_clean_action)
         
         # About Menu
