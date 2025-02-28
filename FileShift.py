@@ -6,6 +6,7 @@ import sys
 import subprocess
 import py7zr
 import requests
+import json
 from datetime import datetime
 from pathlib import Path
 from PySide6.QtCore import QFile, QSettings, QTextStream
@@ -27,7 +28,233 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QFormLayout,
+    QDialog
 )
+
+def initialize_theme(parent, theme_file):
+    try:
+        file = QFile(theme_file)
+        if file.open(QFile.ReadOnly | QFile.Text):
+            stream = QTextStream(file)
+            stylesheet = stream.readAll()
+            parent.setStyleSheet(stylesheet)
+        file.close()
+    except Exception as ex:
+        QMessageBox.critical(parent, "Theme load error", f"Failed to load theme: {str(ex)}")
+        
+        
+class ConfigManager:
+    def __init__(self, parent, filename):
+        """Initializes the ConfigManager with a specific JSON configuration file."""
+        self.parent = parent
+        self.filename = filename
+        self.data = self._load_config()
+
+    def _load_config(self):
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except json.JSONDecodeError:
+                QMessageBox.warning(self.parent, "Load config warning", f"Warning: {self.filename} contains invalid JSON. Resetting configuration.")
+        
+        # Reset if file is missing or corrupted
+        self.reset_config()
+        return {}
+
+    def save_config(self):
+        """Saves the current configuration to the JSON file."""
+        with open(self.filename, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, indent=4)
+
+    def set(self, key, value):
+        """Sets a configuration value and saves immediately."""
+        self.data[key] = value
+        self.save_config()
+
+    def get(self, key, default=None):
+        """Gets a configuration value, returning a default if the key doesn't exist."""
+        return self.data.get(key, default)
+
+    def delete(self, key):
+        """Deletes a key from the configuration and saves the file."""
+        if key in self.data:
+            del self.data[key]
+            self.save_config()
+
+    def reset_config(self):
+        """Resets the configuration file to an empty dictionary."""
+        self.data = {}
+        self.save_config()
+
+    def switch_config_file(self, new_filename):
+        """Switches to a different JSON configuration file and loads its data."""
+        self.filename = new_filename
+        self.data = self._load_config()
+    
+    def get_all_keys(self):
+        """Gets all keys of configuration file in a list and returns them as list."""
+        dict_keys = self.data.keys()
+        return list(dict_keys)
+
+class CustomAutoFillAction(QDialog):
+    def __init__(self):
+        super().__init__()
+        
+        # Initialize current working directory and theme file
+        self.current_working_dir = os.getcwd()
+        theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
+        dark_theme_file = os.path.join(theme_file_path,"dark.qss")
+        
+        # Initialize configuration file
+        CONFIGURATION_CUSTOM_ACTION_FILE = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
+        self.custom_action_config = ConfigManager(self, CONFIGURATION_CUSTOM_ACTION_FILE)
+        
+        # Initialize settings for window geometry
+        self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
+        geometry = self.settings.value("action_geometry", bytes())
+        icon = QIcon("_internal\\icon\\app.ico")
+        
+        # Set window properties
+        self.setWindowTitle("Create custom autofill action")
+        self.setWindowIcon(icon)
+        self.setFixedHeight(280)
+        self.restoreGeometry(geometry)
+        self.setModal(True)
+        initialize_theme(self, dark_theme_file)
+        self.initUI()
+        
+        # Populate combobox with keys from the configuration file
+        self.update_combobox()
+
+
+    def initUI(self):
+        main_layout = QVBoxLayout()
+        form_layout = QFormLayout()
+        hor_layout = QHBoxLayout()
+        
+        # Elements
+        self.description = QLabel("Here you can use the inputs below to create a custom autofill action:")
+        self.action_name_input = QLineEdit()
+        self.search_pattern_action_input = QLineEdit()
+        self.find_text_action_input = QLineEdit()
+        self.replace_text_action_input = QLineEdit()
+        self.remove_phrases_action_input = QLineEdit()
+        self.save_button = QPushButton("Save Action")
+        self.save_button.clicked.connect(self.save_custom_action)
+        
+        # Elemets for horizontal layout
+        self.combobox_label = QLabel("Select an existing action:")
+        self.custom_autofill_actions_combobox = QComboBox()
+        self.load_action_button = QPushButton("Load Action")
+        self.load_action_button.clicked.connect(self.load_custom_action)
+        self.delete_action_button = QPushButton("Delete Action")
+        self.delete_action_button.clicked.connect(self.delete_custom_action)
+        
+        # Add elements to horizontal layout
+        hor_layout.addWidget(self.combobox_label)
+        hor_layout.addWidget(self.custom_autofill_actions_combobox, stretch=1)
+        hor_layout.addWidget(self.load_action_button)
+        hor_layout.addWidget(self.delete_action_button)
+        
+        # Add elements to form layout with labels
+        form_layout.addRow(QLabel("Description:"), self.description)
+        form_layout.addRow(QLabel("Action Name:"), self.action_name_input)
+        form_layout.addRow(QLabel("Search Pattern:"), self.search_pattern_action_input)
+        form_layout.addRow(QLabel("Find Text:"), self.find_text_action_input)
+        form_layout.addRow(QLabel("Replace Text:"), self.replace_text_action_input)
+        form_layout.addRow(QLabel("Remove Phrases:"), self.remove_phrases_action_input)
+        
+        # Add form layout to main layout
+        main_layout.addLayout(hor_layout)
+        main_layout.addLayout(form_layout)
+        main_layout.addWidget(self.save_button)
+        
+        self.setLayout(main_layout)
+
+
+    def save_custom_action(self):
+        try:
+            action_name = self.action_name_input.text()
+            search_pattern = self.search_pattern_action_input.text()
+            find_text = self.find_text_action_input.text()
+            replace_text = self.replace_text_action_input.text()
+            remove_phrases = self.remove_phrases_action_input.text()
+            
+            if not action_name:
+                QMessageBox.warning(self, "Missing action name", "Please fill in the Action Name in order to save the custom action.")
+                return
+            
+            if not search_pattern and not find_text and not replace_text and not remove_phrases:
+                QMessageBox.warning(self, "Missing action details", "Please fill in at least one of the fields to save the custom action.")
+                return
+            
+            # Save the custom action to the configuration file
+            self.custom_action_config.set(action_name, {
+                "search_pattern": search_pattern,
+                "find_text": find_text,
+                "replace_text": replace_text,
+                "remove_phrases": remove_phrases
+            })
+            
+            self.update_combobox()
+            
+            QMessageBox.information(self, "Action saved", f"Custom action '{action_name}' has been saved successfully.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while saving the custom action: {str(ex)}")
+
+
+    def load_custom_action(self):
+        try:
+            custom_action_combobox_value = self.custom_autofill_actions_combobox.currentText()
+            data = self.custom_action_config.get(custom_action_combobox_value)
+            
+            if data:
+                self.action_name_input.setText(custom_action_combobox_value)
+                self.search_pattern_action_input.setText(data["search_pattern"])
+                self.find_text_action_input.setText(data["find_text"])
+                self.replace_text_action_input.setText(data["replace_text"])
+                self.remove_phrases_action_input.setText(data["remove_phrases"])
+            
+        except Exception as ex:
+            QMessageBox.critical(self, "Load custom action error", f"An error occurred, {str(ex)}")
+    
+    
+    def delete_custom_action(self):
+        try:
+            custom_action_combobox_value = self.custom_autofill_actions_combobox.currentText()
+            custom_action_combobox_index = self.custom_autofill_actions_combobox.currentIndex()
+            if custom_action_combobox_value:
+                reply = QMessageBox.question(self, "Delete selected action?", f"Are you sure you want to delete the {custom_action_combobox_value} action?")
+                if reply:
+                    self.custom_action_config.delete(custom_action_combobox_value)
+                    self.custom_autofill_actions_combobox.removeItem(custom_action_combobox_index)
+                    self.clear_all_inputs()
+                else:
+                    return
+            else:
+                QMessageBox.information(self, "No action to delete", "Please select an action from the combobox first.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error while trying to delete action", f"An error has occured while trying to delete the custom action. {str(ex)}")
+    
+    
+    def update_combobox(self):
+        self.custom_autofill_actions_combobox.clear()
+        self.custom_autofill_actions_combobox.addItems(self.custom_action_config.get_all_keys())
+    
+    
+    def clear_all_inputs(self):
+        inputs = [self.action_name_input, self.search_pattern_action_input , self.find_text_action_input, self.replace_text_action_input, self.remove_phrases_action_input]
+        for input in inputs:
+            input.clear()
+            
+            
+    def closeEvent(self, event: QCloseEvent):
+        # Save geometry on close
+        geometry = self.saveGeometry()
+        self.settings.setValue("action_geometry", geometry)
+        super(CustomAutoFillAction, self).closeEvent(event)
 
 
 # Regex Generator class to convert string to regex pattern
@@ -129,15 +356,15 @@ class MainWindow(QMainWindow):
         self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        self.version = "1.1.4" # Current version of the application
+        self.version = "1.2.0" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
         icon = QIcon("_internal\\icon\\app.ico")
         self.restoreGeometry(geometry)
-        self.initialize_theme(dark_theme_file)
+        initialize_theme(self, dark_theme_file)
         self.setWindowIcon(icon)
-        self.initUI()
         self.setWindowTitle(f"FileShift v{self.version} © - by Jovan")
+        self.initUI()
         self.create_menu_bar()
 
     def initUI(self):
@@ -409,15 +636,22 @@ class MainWindow(QMainWindow):
         
         fill_menu = menubar.addMenu("&AutoFill")
         lob_jar_clean_action = QAction("Lobster .jar Cleanup", self)
+        fill_menu.addSeparator()
+        add_custom_clean_action = QAction("+ Add Custom Clean Action", self)
+        add_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
         lob_jar_clean_action.triggered.connect(self.fill_lobster_jar_cleanup)
         fill_menu.addAction(lob_jar_clean_action)
+        fill_menu.addAction(add_custom_clean_action)
         
         # About Menu
         about_menu = menubar.addMenu("&About")
         check_updates_action = QAction("Check for Updates", self)
         check_updates_action.triggered.connect(self.check_for_updates)
         about_menu.addAction(check_updates_action)
-        
+    
+    def open_custom_autofill_action(self):
+        self.w = CustomAutoFillAction()
+        self.w.show()
     
     def change_path_separator(self):
         try:
@@ -805,17 +1039,6 @@ class MainWindow(QMainWindow):
                         self.program_output.append(f"<span style='color: orange'><strong>WARNING:</strong></span> {warn_count} files were not found.")
                 except Exception as e:
                     self.program_output.append(f"<span style='color: red'>FATAL ERROR: {e}</span>")
-
-    def initialize_theme(self, theme_file):
-        try:
-            file = QFile(theme_file)
-            if file.open(QFile.ReadOnly | QFile.Text):
-                stream = QTextStream(file)
-                stylesheet = stream.readAll()
-                self.setStyleSheet(stylesheet)
-            file.close()
-        except Exception as ex:
-            QMessageBox.critical(self, "Theme load error", f"Failed to load theme: {str(ex)}")
             
     def closeEvent(self, event: QCloseEvent):
         # Save geometry on close
