@@ -147,6 +147,7 @@ class CustomAutoFillAction(QDialog):
         # Elemets for horizontal layout
         self.combobox_label = QLabel("Select an existing action:")
         self.custom_autofill_actions_combobox = QComboBox()
+        self.custom_autofill_actions_combobox.setDisabled(True)
         self.load_action_button = QPushButton("Load Action")
         self.load_action_button.clicked.connect(self.load_custom_action)
         self.delete_action_button = QPushButton("Delete Action")
@@ -240,8 +241,11 @@ class CustomAutoFillAction(QDialog):
     
     
     def update_combobox(self):
-        self.custom_autofill_actions_combobox.clear()
-        self.custom_autofill_actions_combobox.addItems(self.custom_action_config.get_all_keys())
+        config_file_values = self.custom_action_config.get_all_keys()
+        if len(config_file_values) > 0:
+            self.custom_autofill_actions_combobox.setDisabled(False)
+            self.custom_autofill_actions_combobox.clear()
+            self.custom_autofill_actions_combobox.addItems(config_file_values)
     
     
     def clear_all_inputs(self):
