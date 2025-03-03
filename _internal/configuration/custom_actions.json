@@ -1,1 +1,26 @@
-{}
+{
+    "Test": {
+        "search_pattern": "SRCHAAAAAAAA",
+        "find_text": "FIND",
+        "replace_text": "REPLACE",
+        "remove_phrases": "REMOVE"
+    },
+    "TestTwo": {
+        "search_pattern": "SRCH",
+        "find_text": "FIND",
+        "replace_text": "REPLACE",
+        "remove_phrases": "REMOVE"
+    },
+    "One": {
+        "search_pattern": "SRCH",
+        "find_text": "FIND",
+        "replace_text": "REPLACE",
+        "remove_phrases": "REMOVE"
+    },
+    "A big ass test": {
+        "search_pattern": "4124312",
+        "find_text": "FINDwdeada",
+        "replace_text": "REPLACEdasdasda",
+        "remove_phrases": "REMOVEdasdadsd"
+    }
+}

@@ -57,7 +57,7 @@ class ConfigManager:
                 with open(self.filename, "r", encoding="utf-8") as f:
                     return json.load(f)
             except json.JSONDecodeError:
-                QMessageBox.warning(self.parent, "Load config warning", f"Warning: {self.filename} contains invalid JSON. Resetting configuration.")
+                QMessageBox.warning(self.parent, "Load config warning", f"Warning: {self.filename} contains invalid JSON. Resetting configuration file.")
         
         # Reset if file is missing or corrupted
         self.reset_config()
@@ -99,8 +99,9 @@ class ConfigManager:
         return list(dict_keys)
 
 class CustomAutoFillAction(QDialog):
-    def __init__(self):
+    def __init__(self, main_window):
         super().__init__()
+        self.main_window = main_window  # Store the MainWindow instance
         
         # Initialize current working directory and theme file
         self.current_working_dir = os.getcwd()
@@ -200,6 +201,7 @@ class CustomAutoFillAction(QDialog):
             })
             
             self.update_combobox()
+            self.main_window.load_custom_actions()
             
             QMessageBox.information(self, "Action saved", f"Custom action '{action_name}' has been saved successfully.")
         except Exception as ex:
@@ -360,6 +362,7 @@ class MainWindow(QMainWindow):
         self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
+        custom_actions_config = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
         self.version = "1.2.0" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
@@ -445,10 +448,10 @@ class MainWindow(QMainWindow):
         pattern_layout = QVBoxLayout()
         pattern_header = QHBoxLayout()
         pattern_header.addWidget(QLabel("Search Pattern:"))
-        self.regex_pattern_input = QLineEdit()
-        self.regex_pattern_input.setPlaceholderText("Enter text to convert to regex pattern which is used to search the displayed file content...")
-        self.regex_pattern_input.setToolTip("Enter a regex pattern to search for in the displayed file content.")
-        self.regex_pattern_input.setClearButtonEnabled(True)
+        self.search_pattern_input = QLineEdit()
+        self.search_pattern_input.setPlaceholderText("Enter text to convert to regex pattern which is used to search the displayed file content...")
+        self.search_pattern_input.setToolTip("Enter a regex pattern to search for in the displayed file content.")
+        self.search_pattern_input.setClearButtonEnabled(True)
         
         pattern_buttons = QHBoxLayout()
         self.convert_entered_string_to_regex_button = QPushButton("Convert to Regex")
@@ -461,7 +464,7 @@ class MainWindow(QMainWindow):
         pattern_buttons.addWidget(self.search_file_contents_and_display_button)
         
         pattern_layout.addLayout(pattern_header)
-        pattern_layout.addWidget(self.regex_pattern_input)
+        pattern_layout.addWidget(self.search_pattern_input)
         pattern_layout.addLayout(pattern_buttons)
 
         # Text manipulation
@@ -617,7 +620,6 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        
         # Open Menu
         open_menu = menubar.addMenu("&Open")
         
@@ -638,24 +640,67 @@ class MainWindow(QMainWindow):
         self.change_word_wrap_action.toggled.connect(self.change_word_wrap)
         view_menu.addAction(self.change_word_wrap_action)
         
-        fill_menu = menubar.addMenu("&AutoFill")
+        self.fill_menu = menubar.addMenu("&AutoFill")
         lob_jar_clean_action = QAction("Lobster .jar Cleanup", self)
-        fill_menu.addAction(lob_jar_clean_action)
-        fill_menu.addSeparator()
+        self.fill_menu.addAction(lob_jar_clean_action)
+        self.fill_menu.addSeparator()
         add_custom_clean_action = QAction("+ Add Custom Clean Action", self)
         add_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
         lob_jar_clean_action.triggered.connect(self.fill_lobster_jar_cleanup)
-        fill_menu.addAction(add_custom_clean_action)
+        self.fill_menu.addAction(add_custom_clean_action)
         
         # About Menu
         about_menu = menubar.addMenu("&About")
         check_updates_action = QAction("Check for Updates", self)
         check_updates_action.triggered.connect(self.check_for_updates)
         about_menu.addAction(check_updates_action)
+        
+        self.load_custom_actions()
+    
+    def load_custom_actions(self):
+        try:
+            custom_actions_config = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
+            with open(custom_actions_config, "r") as jf:
+                data = json.load(jf)
+            if data:
+                # Clear existing custom actions
+                for action in self.fill_menu.actions():
+                    if action.text() not in ["Lobster .jar Cleanup", "+ Add Custom Clean Action"]:
+                        self.fill_menu.removeAction(action)
+                        
+                # Add new custom actions
+                for key, value in data.items():
+                    action = QAction(key, self)
+                    action.triggered.connect(lambda checked, k=key, config_data=data: self.execute_custom_action(k, config_data))
+                    self.fill_menu.insertAction(self.fill_menu.actions()[1], action)
+
+        except json.JSONDecodeError:
+            QMessageBox.critical(self, "Error occurred", "The JSON file contains invalid JSON.")
+        except FileNotFoundError:
+            QMessageBox.critical(self, "Error occurred", "The JSON file was not found.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error occurred", f"An error occurred while loading custom actions: {str(ex)}")
+    
+    
+    def execute_custom_action(self, action_name, config_data):
+        try:
+            if config_data:
+                action_data = config_data[action_name]
+                # Add your custom action logic here
+                self.search_pattern_input.setText(action_data["search_pattern"])
+                self.find_string_input.setText(action_data["find_text"])
+                self.replace_string_input.setText(action_data["replace_text"])
+                self.phrase_to_remove_input.setText(action_data["remove_phrases"])
+            else:
+                QMessageBox.warning(self, "Action not found", f"No data found for action '{action_name}'.")
+        except Exception as ex:
+            QMessageBox.critical(self, "Error", f"An error occurred while executing the custom action: {str(ex)}")
+    
     
     def open_custom_autofill_action(self):
-        self.w = CustomAutoFillAction()
+        self.w = CustomAutoFillAction(self)
         self.w.show()
+    
     
     def change_path_separator(self):
         try:
@@ -683,7 +728,7 @@ class MainWindow(QMainWindow):
     def search_and_replace_file_content(self):
         try:
             file_view_content = self.file_content_display.toPlainText()
-            regex_input = self.regex_pattern_input.text()
+            regex_input = self.search_pattern_input.text()
 
             if len(regex_input) > 0:
                 # Compile the regex for better performance
@@ -761,7 +806,7 @@ class MainWindow(QMainWindow):
     def fill_lobster_jar_cleanup(self):
         try:
             # Get file content
-            self.regex_pattern_input.setText(r"(Marking)\s(file)")
+            self.search_pattern_input.setText(r"(Marking)\s(file)")
             self.find_string_input.setText("./lib/")
             self.replace_string_input.setText("D:/Lobster_data/lib/")
             self.phrase_to_remove_input.setText("Marking file, ', to be deleted on exit of JVM")
@@ -818,11 +863,11 @@ class MainWindow(QMainWindow):
         
     def generate_regex(self):
         try:
-            input_text = self.regex_pattern_input.text()
+            input_text = self.search_pattern_input.text()
             if len(input_text) > 0:
-                self.regex_pattern_input.clear()
+                self.search_pattern_input.clear()
                 self.generator = RegexGenerator(input_text)
-                self.regex_pattern_input.setText(self.generator.get_regex())
+                self.search_pattern_input.setText(self.generator.get_regex())
                 self.program_output.setText(f"Generated the following RegEx: '{self.generator.get_regex()}'.")
             else:
                 QMessageBox.warning(self, "Input warning", "No string has been entered in the input element.")
