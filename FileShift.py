@@ -229,8 +229,8 @@ class CustomAutoFillAction(QDialog):
             custom_action_combobox_value = self.custom_autofill_actions_combobox.currentText()
             custom_action_combobox_index = self.custom_autofill_actions_combobox.currentIndex()
             if custom_action_combobox_value:
-                reply = QMessageBox.question(self, "Delete selected action?", f"Are you sure you want to delete the {custom_action_combobox_value} action?")
-                if reply:
+                reply = QMessageBox.question(self, "Delete selected action?", f"Are you sure you want to delete the action {custom_action_combobox_value}?",QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply == QMessageBox.Yes:
                     self.custom_action_config.delete(custom_action_combobox_value)
                     self.custom_autofill_actions_combobox.removeItem(custom_action_combobox_index)
                     self.clear_all_inputs()
