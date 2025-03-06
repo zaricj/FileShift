@@ -233,6 +233,7 @@ class CustomAutoFillAction(QDialog):
                 if reply:
                     self.custom_action_config.delete(custom_action_combobox_value)
                     self.custom_autofill_actions_combobox.removeItem(custom_action_combobox_index)
+                    self.main_window.load_custom_actions() # Removes action from fill menu
                     self.clear_all_inputs()
                 else:
                     return
@@ -362,7 +363,7 @@ class MainWindow(QMainWindow):
         self.refresh_icon = QIcon("_internal\\icon\\refresh.svg")
         theme_file_path = os.path.join(self.current_working_dir,"_internal","theme_files")
         dark_theme_file = os.path.join(theme_file_path,"dark.qss")
-        custom_actions_config = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
+        self.custom_actions_config = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
         self.version = "1.2.0" # Current version of the application
         self.settings = QSettings("Application", "Name") # Settings to save current location of the windows on exit
         geometry = self.settings.value("geometry", bytes())
@@ -616,6 +617,12 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
+        manage_custom_clean_action = QAction("Add and Manage Custom Actions", self)
+        manage_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
+        file_menu.addAction(manage_custom_clean_action)
+        
+        file_menu.addSeparator()
+        
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
@@ -643,11 +650,7 @@ class MainWindow(QMainWindow):
         self.fill_menu = menubar.addMenu("&AutoFill")
         lob_jar_clean_action = QAction("Lobster .jar Cleanup", self)
         self.fill_menu.addAction(lob_jar_clean_action)
-        self.fill_menu.addSeparator()
-        add_custom_clean_action = QAction("+ Add Custom Clean Action", self)
-        add_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
         lob_jar_clean_action.triggered.connect(self.fill_lobster_jar_cleanup)
-        self.fill_menu.addAction(add_custom_clean_action)
         
         # About Menu
         about_menu = menubar.addMenu("&About")
@@ -659,20 +662,18 @@ class MainWindow(QMainWindow):
     
     def load_custom_actions(self):
         try:
-            custom_actions_config = os.path.join(self.current_working_dir, "_internal", "configuration", "custom_actions.json")
-            with open(custom_actions_config, "r") as jf:
+            with open(self.custom_actions_config, "r") as jf:
                 data = json.load(jf)
             if data:
                 # Clear existing custom actions
                 for action in self.fill_menu.actions():
-                    if action.text() not in ["Lobster .jar Cleanup", "+ Add Custom Clean Action"]:
+                    if action.text() not in "Lobster .jar Cleanup":
                         self.fill_menu.removeAction(action)
-                        
                 # Add new custom actions
                 for key, value in data.items():
                     action = QAction(key, self)
                     action.triggered.connect(lambda checked, k=key, config_data=data: self.execute_custom_action(k, config_data))
-                    self.fill_menu.insertAction(self.fill_menu.actions()[1], action)
+                    self.fill_menu.insertAction(self.fill_menu.actions()[0], action)
 
         except json.JSONDecodeError:
             QMessageBox.critical(self, "Error occurred", "The JSON file contains invalid JSON.")
@@ -691,6 +692,9 @@ class MainWindow(QMainWindow):
                 self.find_string_input.setText(action_data["find_text"])
                 self.replace_string_input.setText(action_data["replace_text"])
                 self.phrase_to_remove_input.setText(action_data["remove_phrases"])
+                if len(self.file_content_display.toPlainText()) > 0:
+                    self.search_and_replace_file_content()
+                    self.apply_and_replace_file_content()
             else:
                 QMessageBox.warning(self, "Action not found", f"No data found for action '{action_name}'.")
         except Exception as ex:
@@ -715,6 +719,7 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Changing path separator error", f"An error occurred while trying to change path separator: {str(ex)}")
     
+    
     def enable_change_path_separator_button(self):
         try:
             text = self.replace_string_input.text()
@@ -724,6 +729,7 @@ class MainWindow(QMainWindow):
                 self.change_path_separator_button.setVisible(False)
         except Exception as ex:
             QMessageBox.critical(self, "An error occurred", f"An error has occurred, {str(ex)}")
+    
     
     def search_and_replace_file_content(self):
         try:
@@ -762,6 +768,7 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while searching and replacing the file content: {str(ex)}")
 
+
     def apply_and_replace_file_content(self):
         try:
             # Get content and user inputs
@@ -787,7 +794,7 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while searching and replacing the file content: {str(ex)}")
 
-    
+
     def clean_line(self, line, phrase_to_remove, original_phrase, replacement_phrase):
         # Remove user-specified phrases
         if phrase_to_remove:
@@ -802,7 +809,8 @@ class MainWindow(QMainWindow):
             line = line.replace(original_phrase, replacement_phrase)
 
         return line
-    
+
+
     def fill_lobster_jar_cleanup(self):
         try:
             # Get file content
@@ -816,6 +824,7 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while trying to fill the lobster jar cleanup: {str(ex)}")
 
+
     def change_word_wrap(self):
         if self.change_word_wrap_action.isChecked():
             self.file_content_display.setWordWrapMode(QTextOption.ManualWrap)
@@ -823,7 +832,8 @@ class MainWindow(QMainWindow):
         else:
             self.file_content_display.setWordWrapMode(QTextOption.WordWrap)
             self.program_output.setWordWrapMode(QTextOption.WordWrap)
-        
+
+
     def open_file_helper_method(self, file_path: str):
         try:
             if len(file_path) == 0:
@@ -837,7 +847,8 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
             QMessageBox.critical(self, "Error", message)
-    
+
+
     def open_folder_helper_method(self, folder_path):
         try:
             if len(folder_path) == 0:
@@ -849,7 +860,8 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
             QMessageBox.critical(self, "Error", message)
-            
+
+
     def clean_paths_in_line(self, file_content_display_text):
         try:
             file_content_display_text = self.file_content_display.toPlainText()
@@ -860,7 +872,8 @@ class MainWindow(QMainWindow):
             return cleaned_lines
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while cleaning high commas ' in the paths: {str(ex)}")
-        
+
+
     def generate_regex(self):
         try:
             input_text = self.search_pattern_input.text()
@@ -873,7 +886,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Input warning", "No string has been entered in the input element.")
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while generating the regex: {str(ex)}")
-    
+
+
     def extract_dates_from_log(self, log_content):
         try:
             # Split the log content into lines
@@ -933,7 +947,8 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "An error occurred", f"An exception of type {type(ex).__name__} occurred while trying to get the log file dates. {str(ex)}")
             return []
-    
+
+
     def extract_lines_by_date_and_display(self, log_content, selected_date):
         filtered_lines = [
             line for line in log_content.splitlines() if line.startswith(selected_date)
@@ -950,7 +965,8 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while displaying the log entries: {str(ex)}")
         return filtered_lines
-    
+
+
     def extract_data_from_log(self, file_path):
         try:
             if file_path:
@@ -959,7 +975,8 @@ class MainWindow(QMainWindow):
                 return file_data
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while reading the file: {str(ex)}")
-    
+
+
     def refresh_file_content(self):
         try:
             current_text = self.log_dates_combobox.currentText()
@@ -975,7 +992,8 @@ class MainWindow(QMainWindow):
                     self.file_content_display.setPlainText(file_data)
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while refreshing the file content: {str(ex)}")
-        
+
+
     def browse_file(self):
         try:
             file_dialog = QFileDialog(self)
@@ -1011,16 +1029,19 @@ class MainWindow(QMainWindow):
         except Exception as ex:
             QMessageBox.critical(self, "Error", f"An error occurred while opening the file: {str(ex)}")
 
+
     def get_line_count(self, file_path):
         with open(file_path, "r") as file:
             lines = file.readlines()
             return len(lines)
-    
+
+
     def browse_folder(self):
         folder_dialog = QFileDialog(self)
         folder_path = folder_dialog.getExistingDirectory(self, "Select Folder")
         if folder_path:
             self.destination_input.setText(folder_path)
+
 
     def move_files(self):
         destination = self.destination_input.text()
@@ -1088,13 +1109,15 @@ class MainWindow(QMainWindow):
                         self.program_output.append(f"<span style='color: orange'><strong>WARNING:</strong></span> {warn_count} files were not found.")
                 except Exception as e:
                     self.program_output.append(f"<span style='color: red'>FATAL ERROR: {e}</span>")
-            
+
+
     def closeEvent(self, event: QCloseEvent):
         # Save geometry on close
         geometry = self.saveGeometry()
         self.settings.setValue("geometry", geometry)
         super(MainWindow, self).closeEvent(event)
         
+
 
     def check_for_updates(self):
         install_path = self.current_working_dir
@@ -1162,7 +1185,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while extracting the update:\n{str(e)}")
         
-            
+
     def create_updater_script(self, install_path, temp_path):
         return f"""
 import os
