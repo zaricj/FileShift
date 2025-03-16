@@ -617,7 +617,7 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
-        manage_custom_clean_action = QAction("Add and Manage Custom Actions", self)
+        manage_custom_clean_action = QAction("Add or Manage Custom Actions", self)
         manage_custom_clean_action.triggered.connect(self.open_custom_autofill_action)
         file_menu.addAction(manage_custom_clean_action)
         
@@ -837,29 +837,29 @@ class MainWindow(QMainWindow):
     def open_file_helper_method(self, file_path: str):
         try:
             if len(file_path) == 0:
-                QMessageBox.critical(self,"No file path provided","Please provide a file path first.")
+                QMessageBox.warning(self,"No file path provided","Please provide a file path first.")
             elif not os.path.isfile(file_path) or not os.path.exists(file_path):
-                QMessageBox.critical(self,"Not a valid path",f"The entered file path '{file_path}' is not valid or does not exist.")
+                QMessageBox.warning(self,"Not a valid path",f"The entered file path '{file_path}' is not valid or does not exist.")
             else:
                 if "/" in file_path:
                     file_path = file_path.replace("/","\\")
                 os.startfile(file_path)
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
-            QMessageBox.critical(self, "Error", message)
+            QMessageBox.critical(self, "Open file error", message)
 
 
     def open_folder_helper_method(self, folder_path):
         try:
             if len(folder_path) == 0:
-                QMessageBox.critical(self,"No file path provided","Please provide a folder path first.")
+                QMessageBox.warning(self,"No file path provided","Please provide a folder path first.")
             elif not os.path.isdir(folder_path) or not os.path.exists(folder_path):
                 QMessageBox.critical(self,"Not a valid path",f"The entered folder path '{folder_path}' is not valid or does not exist.")
             else:
                 os.startfile(folder_path)
         except Exception as ex:
             message = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args!r}"
-            QMessageBox.critical(self, "Error", message)
+            QMessageBox.critical(self, "Open folder error", message)
 
 
     def clean_paths_in_line(self, file_content_display_text):
@@ -871,7 +871,7 @@ class MainWindow(QMainWindow):
             cleaned_lines = [line.replace("'", "") for line in lines]      
             return cleaned_lines
         except Exception as ex:
-            QMessageBox.critical(self, "Error", f"An error occurred while cleaning high commas ' in the paths: {str(ex)}")
+            QMessageBox.critical(self, "Error", f"An error occurred while cleaning high commas ' in file paths: {str(ex)}")
 
 
     def generate_regex(self):
